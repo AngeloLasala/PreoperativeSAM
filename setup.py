@@ -4,8 +4,8 @@ with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
 setup(
-    name='preoperative SAM',
-    version='0.0',
+    name='preoperativeSAM',
+    version='0.1',
     description='preoperative guideline for self-promoting AI in medical imaging',
     author='Angelo Lasala',
     author_email='Lasala.Angelo@santannapisa.it',
