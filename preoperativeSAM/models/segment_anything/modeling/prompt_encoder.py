@@ -148,22 +148,16 @@ class PromptEncoder(nn.Module):
           torch.Tensor: dense embeddings for the masks, in the shape
             Bx(embed_dim)x(embed_H)x(embed_W)
         """
-        print('starting forward prompt encoder')
         bs = self._get_batch_size(points, boxes, masks)
-        print(f'batch size: {bs}')
         sparse_embeddings = torch.empty((bs, 0, self.embed_dim), device=self._get_device())
-        print(f'initial sparse embeddings shape: {sparse_embeddings.shape} - initialized empty tensor')
         if points is not None:
-            print('embedding points')
             coords, labels = points
             point_embeddings = self._embed_points(coords, labels, pad=(boxes is None))
             sparse_embeddings = torch.cat([sparse_embeddings, point_embeddings], dim=1)
         if boxes is not None:
-            print('embedding boxes')
             box_embeddings = self._embed_boxes(boxes)
             sparse_embeddings = torch.cat([sparse_embeddings, box_embeddings], dim=1)
 
-        print(f'sparse embeddings shape after points/boxes: {sparse_embeddings.shape}')
         if masks is not None:
             dense_embeddings = self._embed_masks(masks)
         else:
@@ -218,50 +212,3 @@ class PositionEmbeddingRandom(nn.Module):
         coords[:, :, 0] = coords[:, :, 0] / image_size[1]
         coords[:, :, 1] = coords[:, :, 1] / image_size[0]
         return self._pe_encoding(coords.to(torch.float))  # B x N x C
-
-if __name__ == '__main__':
-    # Parametri di esempio
-    embed_dim = 256*2
-    image_embedding_size = (64, 64)
-    input_image_size = (1024, 1024)
-    mask_in_chans = 64
-
-    # Istanzia il modulo
-    encoder = PromptEncoder(
-        embed_dim=embed_dim,
-        image_embedding_size=image_embedding_size,
-        input_image_size=input_image_size,
-        mask_in_chans=mask_in_chans
-    )
-
-    # Dummy input
-    B = 2   # batch size
-
-    # Punti (2 punti per immagine)
-    points = torch.tensor([
-        [[100, 200], [400, 800]],  # immagine 1
-        [[500, 300], [800, 600]],  # immagine 2
-    ], dtype=torch.float32)
-    labels = torch.tensor([
-        [1, 0],  # + e -
-        [1, -1],  # + e padding
-    ], dtype=torch.int64)
-
-    # Box (xmin, ymin, xmax, ymax)
-    boxes = torch.tensor([
-        [[100, 200, 500, 800]],
-        [[300, 400, 900, 1000]],
-    ], dtype=torch.float32).squeeze(1)  # shape (B, 4)
-
-    # Maschera fittizia (batch, 1, 4*H_e, 4*W_e)
-    masks = torch.rand(B, 1, 4 * image_embedding_size[0], 4 * image_embedding_size[1])
-
-    # Esegui forward
-    sparse, dense = encoder(
-        points=(points, labels),
-        boxes=boxes,
-        masks=masks
-    )
-
-    print("Sparse embeddings:", sparse.shape)
-    print("Dense embeddings: ", dense.shape)
