@@ -16,6 +16,8 @@ import os
 import cv2
 import pandas as pd
 import random
+import json
+import matplotlib.pyplot as plt
 
 def to_long_tensor(pic):
     # handle numpy array
@@ -25,6 +27,9 @@ def to_long_tensor(pic):
 
 
 def correct_dims(*images):
+    """
+    Function that uniforms the dimention of input images
+    """
     corr_images = []
     # print(images)
     for img in images:
@@ -171,6 +176,7 @@ class JointTransform2D:
         self.ori_size = ori_size
 
     def __call__(self, image, mask):
+        
         #  gamma enhancement
         if np.random.rand() < self.p_gama:
             c = 1
@@ -244,34 +250,25 @@ class IntroperativeiUS(Dataset):
     future direction of the project, i.e., usingi preopreative information for guiding segmentation. 
     In line with this goal the dataset is structured in 'subjects' folders
 
-    Args:
-        dataset_path: path to the dataset. Structure of the dataset should be:
-            dataset_path
-                |-- MainPatient
-                    |-- train.txt
-                    |-- val.txt
-                    |-- text.txt 
-                        {subtaski}/{imgname}
-                    |-- class.json
-                |-- subtask1
-                    |-- img
-                        |-- img001.png
-                        |-- img002.png
-                        |-- ...
-                    |-- label
-                        |-- img001.png
-                        |-- img002.png
-                        |-- ...
-                |-- subtask2
-                    |-- img
-                        |-- img001.png
-                        |-- img002.png
-                        |-- ...
-                    |-- label
-                        |-- img001.png
-                        |-- img002.png
-                        |-- ... 
-                |-- subtask...   
+    Folder structure:
+        main_path
+        ├── dataset_name
+        |    ├── pre 
+        |    |    ├── subject_name
+        |    |    |    ├── img
+        |    |    |    |    ├── subject_name_img_001.png
+        |    |    |    |    ├── subject_name_img_002.png
+        |    |    |    ├── label
+        |    |    |    |    ├── subject_name_label_001.png
+        |    |    |    |    ├── subject_name_label_002.png
+        |    ├── post
+        |    |    ├── subject_name
+        |    |    |    ├── img
+        |    |    |    |    ├── subject_name_img_001.png
+        |    |    |    |    ├── subject_name_img_002.png
+        |    |    |    ├── label
+        |    |    |    |    ├── subject_name_label_001.png
+        |    |    |    |    ├── subject_name_label_002.png
 
         joint_transform: augmentation transform, an instance of JointTransform2D. If bool(joint_transform)
             evaluates to False, torchvision.transforms.ToTensor will be used on both image and mask.
@@ -291,18 +288,18 @@ class IntroperativeiUS(Dataset):
         # dataset path
         self.main_path = main_path
         self.dataset_name = dataset_name
-    
-        self.one_hot_mask = one_hot_mask
         self.split = split
-        id_list_file = os.path.join(dataset_path, 'MainPatient/{0}.txt'.format(split))
-        self.ids = [id_.strip() for id_ in open(id_list_file)]
+    
+        # self.one_hot_mask = one_hot_mask
+        
+        self.data_list = self.get_data_list()
 
-        self.prompt = prompt
-        self.img_size = img_size
+        # self.prompt = prompt
+        # self.img_size = img_size
         self.class_id = class_id
-        self.class_dict_file = os.path.join(dataset_path, 'MainPatient/class.json')
-        with open(self.class_dict_file, 'r') as load_f:
-            self.class_dict = json.load(load_f)
+        # self.class_dict_file = os.path.join(dataset_path, 'MainPatient/class.json')
+        # with open(self.class_dict_file, 'r') as load_f:
+        #     self.class_dict = json.load(load_f)
         if joint_transform:
             self.joint_transform = joint_transform
         else:
@@ -310,28 +307,21 @@ class IntroperativeiUS(Dataset):
             self.joint_transform = lambda x, y: (to_tensor(x), to_tensor(y))
 
     def __len__(self):
-        return len(self.ids)
+        return len(self.data_list)
 
-    def __getitem__(self, i):
-        id_ = self.ids[i]
-        if "test" in self.split:
-            sub_path, filename = id_.split('/')[0], id_.split('/')[1]
-            # class_id0, sub_path, filename = id_.split('/')[0], id_.split('/')[1], id_.split('/')[2]
-            # self.class_id = int(class_id0)
-        else:
-            class_id0, sub_path, filename = id_.split('/')[0], id_.split('/')[1], id_.split('/')[2]
-        img_path = os.path.join(os.path.join(self.dataset_path, sub_path), 'img')
-        label_path = os.path.join(os.path.join(self.dataset_path, sub_path), 'label')
-        image = cv2.imread(os.path.join(img_path, filename + '.png'), 0)
-        mask = cv2.imread(os.path.join(label_path, filename + '.png'), 0)
-        classes = self.class_dict[sub_path]
-        if classes == 2:
-            mask[mask > 1] = 1
-
+    def __getitem__(self, idx):
+        
+        class_id0, image, mask = self.get_image_label(idx)
+        
         # correct dimensions if needed
+        print(image.shape, mask.shape)
         image, mask = correct_dims(image, mask)  
+        print(image.shape, mask.shape)
+
         if self.joint_transform:
+            print('sono qui')
             image, mask, low_mask = self.joint_transform(image, mask)
+            
         if self.one_hot_mask:
             assert self.one_hot_mask > 0, 'one_hot_mask must be nonnegative'
             mask = torch.zeros((self.one_hot_mask, mask.shape[1], mask.shape[2])).scatter_(0, mask.long(), 1)
@@ -374,8 +364,67 @@ class IntroperativeiUS(Dataset):
             'class_id': class_id,
             }
 
+
+    def get_image_label(self, idx):
+        """
+        Get image and label
+        """
+        image_info = self.data_list[idx]
+
+        img_path = os.path.join(self.main_path, self.dataset_name, image_info[0], image_info[1].split('_')[0], 'img', image_info[1])
+        mask_path = os.path.join(self.main_path, self.dataset_name, image_info[0], image_info[1].split('_')[0], 'label', image_info[1])
+        image = cv2.imread(img_path, 0)
+        mask = cv2.imread(mask_path, 0)
+
+        return self.class_id, image, mask
+        
+        
+
+
+
+
+
+    def get_data_list(self):
+        """
+        From patients name get the data list
+        Note: this function take both pre and post for unified training
+        subject_i -> pre/subject_i and post/subject_i
+        """
+        json_path = os.path.join(self.main_path, self.dataset_name, 'splitting.json')
+        with open(json_path, 'r') as f:
+            splitting_dict = json.load(f)
+      
+
+        subject_list = splitting_dict[self.split]
+        data_list = []
+        for subject in subject_list:
+            pre_path = os.path.join(self.main_path, self.dataset_name, 'pre', subject)
+            for img_name in os.listdir(os.path.join(pre_path,'img')):
+                data_pre = ['pre', img_name]
+                data_list.append(data_pre)
+            
+            post_path = os.path.join(self.main_path, self.dataset_name, 'post', subject)
+            for img_name in os.listdir(os.path.join(post_path,'img')):
+                data_post = ['post', img_name]
+                data_list.append(data_post)
+
+        return data_list
+
+        
+
 if __name__ == '__main__':
-    a = 10
     from preoperativeSAM.cfg import get_config
     opt = get_config("PreDura")
     
+    dataset = IntroperativeiUS(main_path=opt.main_path, 
+                                dataset_name=opt.dataset_name, 
+                                split=opt.train_split, 
+                                # joint_transform=JointTransform2D(img_size=opt.img_size, crop=opt.crop, p_flip=0.5, p_rota=0.5, p_scale=0.5, p_gaussn=0.5, p_contr=0.5, p_gama=0.5, p_distor=0.5),
+                                img_size=opt.img_size,
+                                prompt="click",
+                                class_id=1,
+                                one_hot_mask=opt.classes)
+    for image, mask in dataset:
+        if np.sum(mask) > 0 :
+            print('ok')
+        else: print('no mask')
