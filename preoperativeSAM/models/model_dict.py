@@ -2,6 +2,7 @@
 Ausiliar file to load different models
 """
 from preoperativeSAM.models.segment_anything.build_sam import sam_model_registry
+from preoperativeSAM.utils.visualization import get_model_parameters
 
 def get_model(modelname="SAM", args=None, opt=None):
     if modelname == "SAM":
@@ -16,8 +17,7 @@ if __name__ == "__main__":
     import torch
 
     model = get_model("SAM", args=None, opt=None)
-    num_params = sum(p.numel() for p in model.parameters()) / 1e6
-    print(f"Number of parameters: {num_params:.2f}M")
+    get_model_parameters(model)
 
     dummy_input = [
     {
