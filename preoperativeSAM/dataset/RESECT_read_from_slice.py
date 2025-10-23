@@ -221,8 +221,8 @@ def slicing_volume(volume_array, tumor_array, spacing, slice_tumor, subject, sli
         os.makedirs(os.path.join(save_dir, dataset_type), exist_ok=True)
 
         subject_path = os.path.join(save_dir, dataset_type, subject)
-        os.makedirs(os.path.join(subject_path, 'volume'), exist_ok=True)
-        os.makedirs(os.path.join(subject_path, 'tumor'), exist_ok=True)
+        os.makedirs(os.path.join(subject_path, 'img'), exist_ok=True)
+        os.makedirs(os.path.join(subject_path, 'label'), exist_ok=True)
         os.makedirs(os.path.join(subject_path, 'bbox'), exist_ok=True)
     
     ## surface of the max tumor slice
@@ -237,13 +237,13 @@ def slicing_volume(volume_array, tumor_array, spacing, slice_tumor, subject, sli
         int_window = int(slicing_window/spacing[0]) #int of window)
         tumor_surface_list = []
         for slice_i in np.arange(slice_tumor - (int_window//2), slice_tumor + (int_window//2) + 1 ,int_slicing):
-            logging.info(f'tumor surface: {np.sum(tumor_array[slice_i, :, :]) * spacing[1] * spacing[2]:.4f}')
             tumor_surface_list.append(np.sum(tumor_array[slice_i, :, :]) * spacing[1] * spacing[2])
+
 
             ## save the dataset
             if save_dataset:
                 vol = volume_array[slice_i, :, :]
-                tum = tumor_array[slice_i, :, :]*255
+                tum = tumor_array[slice_i, :, :]
             
                 # convert un PIL image
                 vol = Image.fromarray(vol).convert('L')
@@ -251,21 +251,9 @@ def slicing_volume(volume_array, tumor_array, spacing, slice_tumor, subject, sli
         
                 # save the image, only image with tumor
                 if np.sum(tum) > 0.0: 
-                    vol.save(os.path.join(subject_path, 'volume', f'{subject}_{slice_i}.png'))
-                    tum.save(os.path.join(subject_path, 'tumor', f'{subject}_{slice_i}.png'))
+                    vol.save(os.path.join(subject_path, 'img', f'{subject}_{slice_i}.png'))
+                    tum.save(os.path.join(subject_path, 'label', f'{subject}_{slice_i}.png'))
 
-
-                
-            # plt.figure(figsize=(15, 15), num=f'{slice_i} slice', tight_layout=True)
-            # plt.subplot(1, 2, 1)
-            # plt.imshow(volume_array[slice_i, :, :], cmap='gray')
-            # plt.imshow(tumor_array[slice_i, :, :], alpha=0.2, cmap='jet')
-            # plt.axis('off')
-
-            # plt.subplot(1, 2, 2)
-            # plt.imshow(volume_array[slice_i, :, :], cmap='gray')
-            # plt.axis('off')
-            # plt.show()
         return max_tumor_surface, tumor_surface_list
     
     else:
@@ -306,8 +294,6 @@ def main(args):
 
     plt.show()
 
-
-
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Read the dataset of the RESECT iUS dataset')
@@ -323,46 +309,3 @@ if __name__ == "__main__":
 
     main(args)
     
-
-    # # Read the entire dataset
-    # volume_list, depht_list, aspect_ratio = [], [], []
-    # for subject in tqdm.tqdm(subjects_with_volume):
-    #     volume, tumor, sulci, flax, tumor_size, spacing, slice_tumor = read_volume_label_subject(args.dataset_path, dataset_dict, subject, show_plot=False)
-    #     max_tumor, aspect_ratio = slicing_volume(volume, tumor, sulci, flax, spacing, slice_tumor, subject,
-    #                                              slice_spacing=1.0,
-    #                                              dataset_path=args.dataset_path, save_dataset=True)
-    #     aspect_ratio.append(volume.shape[1]/volume.shape[2])
-    #     depht_list.append(max_tumor)
-    #     volume_list.append(tumor_size/1000.0)
-    #     # print(f'Subject: {subject}, tumor size: {tumor_size/1000.0:.4f} [cm^3]')
-
-    # ## get a single list of item from the list of list of dehpt_list
-    # depht_list = [item/100.0 for sublist in depht_list for item in sublist]
-    # print(f'Number of 2D slice: {len(depht_list)}')
-
-    # ## plot the histogram of the tumor size
-    # plt.figure('Tumor size', figsize=(5, 5), tight_layout=True)
-    # plt.subplot(1, 2, 1)
-    # sns.boxplot(volume_list,  color='green', boxprops={'alpha': 0.5}, flierprops={'marker': 'o', 'markersize': 5})
-    # sns.stripplot(volume_list, color='k', alpha=1, jitter=True, size=5)
-    # plt.xlabel('Tumor size')
-    # plt.ylabel(r'Tumor size [cm$^3$]')
-    # plt.grid(axis='y', linestyle=':')
-
-    # plt.subplot(1, 2, 2)
-    # sns.boxplot(depht_list,  color='green', boxprops={'alpha': 0.5}, flierprops={'marker': 'o', 'markersize': 5})
-    # sns.stripplot(depht_list, color='k', alpha=0.6, jitter=True, size=3)
-    # plt.xlabel('tumor surface')
-    # plt.ylabel(r'tumor surface [cm$^2$]')
-    # plt.grid(axis='y', linestyle=':')
-
-    # plt.figure('aspect ratio', figsize=(5, 5), tight_layout=True)
-    # print(aspect_ratio)
-    # sns.boxplot(aspect_ratio,  color='green', boxprops={'alpha': 0.5}, flierprops={'marker': 'o', 'markersize': 5})
-    # sns.stripplot(aspect_ratio, color='k', alpha=0.6, jitter=True, size=3)
-    # plt.xlabel('aspect ratio')
-    # plt.ylabel('aspect ratio')
-    # plt.grid(axis='y', linestyle=':')
-    
-    # plt.show()
-
