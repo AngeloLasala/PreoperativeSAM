@@ -7,7 +7,6 @@ from preoperativeSAM.utils.visualization import get_model_parameters
 def get_model(modelname="SAM", args=None, opt=None):
     if modelname == "SAM":
         model = sam_model_registry['vit_b'](checkpoint=None)
-    
     ## here you can add more models if needed
     else:
         raise RuntimeError("Could not find the model:", modelname)
