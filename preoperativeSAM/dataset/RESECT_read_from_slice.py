@@ -13,6 +13,7 @@ import argparse
 import tqdm
 import seaborn as sns
 from PIL import Image
+import math
 
 def check_subject_volume(dataset_path):
     """
@@ -227,9 +228,6 @@ def slicing_volume(volume_array, tumor_array, spacing, slice_tumor, subject, sli
     
     ## surface of the max tumor slice
     if tumor_array is not None and np.sum(tumor_array) > 0.0:
-        print("tumor_array type:", type(tumor_array))
-        print("slice_tumor:", slice_tumor, "type:", type(slice_tumor))
-        print("spacing:", spacing, "type:", type(spacing))
         max_tumor_surface = np.sum(tumor_array[slice_tumor, :, :]) * spacing[1] * spacing[2]
         slicing_window = tumor_array.shape[0] * spacing[0] // 4
 
@@ -263,6 +261,24 @@ def slicing_volume(volume_array, tumor_array, spacing, slice_tumor, subject, sli
         print("spacing:", spacing, "type:", type(spacing))
         return None, None
 
+def get_data_splittings(subjects_list, train_percentage=0.8, val_percentage=0.1, test_percentage=0.1, splitting_seed=42):
+    """
+    Given the path of the dataset return the list of patient for train, valindation and test
+    """
+    np.random.seed(splitting_seed)
+    np.random.shuffle(subjects_list)
+
+    n_test = math.floor(len(subjects_list) * test_percentage) 
+    n_val = math.floor(len(subjects_list) * val_percentage)
+    n_train = math.floor(len(subjects_list) * train_percentage) + 1  ## floor(18.4) = 18 so i add 1
+
+    train = subjects_list[:n_train]
+    val = subjects_list[n_train:n_train+n_val]
+    test = subjects_list[n_train+n_val:]
+    splitting_dict = {'train': train, 'val': val, 'test': test}
+
+    return splitting_dict
+
 def main(args):
     """
     Create the folder of pre and post image and label
@@ -291,6 +307,11 @@ def main(args):
         # slicing post
         slicing_volume(volume_post, tumor_post, spacing_post, slice_tumor_post, subject,
                         slice_spacing=1.0, save_dir=args.save_dir, dataset_type='post', save_dataset=True)  
+    
+    # create json file with the splitting
+    splitting_dict = get_data_splittings(subject_list, train_percentage=0.8, val_percentage=0.1, test_percentage=0.1, splitting_seed=42)
+    with open(os.path.join(args.save_dir, 'splitting.json'), 'w') as json_file:
+        json.dump(splitting_dict, json_file, indent=4)
 
     plt.show()
 
