@@ -1,5 +1,7 @@
 """
 Main train script for PreoperativeSAM.
+
+Adapted from Samus: https://github.com/xianlin7/SAMUS
 """
 import argparse
 import os
@@ -15,10 +17,13 @@ from torch.utils.tensorboard import SummaryWriter
 import time
 import random
 import logging
+from tqdm import tqdm
 
 from preoperativeSAM.cfg import get_config
 from preoperativeSAM.models.model_dict import get_model
 from preoperativeSAM.utils.visualization import get_model_parameters
+from preoperativeSAM.utils.loss_functions.sam_loss import get_criterion
+from preoperativeSAM.utils.generate_prompts import get_click_prompt
 from preoperativeSAM.dataset.dataset import JointTransform2D, IntroperativeiUS
 
 
@@ -111,12 +116,39 @@ def main(args):
         b_lr = args.base_lr
         optimizer = optim.Adam(model.parameters(), lr=args.base_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
    
-    # criterion = get_criterion(modelname=args.modelname, opt=opt)
+    criterion = get_criterion(modelname=args.modelname, opt=opt)
     logging.info(' Done!\n')
 
+    ## Model training ################################################################################################
+    iter_num = 0
+    max_iterations = opt.epochs * len(trainloader)
+    best_dice, loss_log, dice_log = 0.0, np.zeros(opt.epochs+1), np.zeros(opt.epochs+1)
+
+    logging.info('Start training ...')        
+    for epoch in range(opt.epochs):
+        progress_bar = tqdm(total=len(trainloader), disable=False)
+        progress_bar.set_description(f"Epoch {epoch + 1}/{opt.epochs}")
+
+        model.train()
+        train_losses = 0
+        for batch_idx, (datapack) in enumerate(trainloader):
+            imgs = datapack['image'].to(dtype = torch.float32, device=opt.device)
+            masks = datapack['low_mask'].to(dtype = torch.float32, device=opt.device)
+            bbox = torch.as_tensor(datapack['bbox'], dtype=torch.float32, device=opt.device)
+            pt = get_click_prompt(datapack, opt)
+
+            ## forward
+            pred = model(imgs, pt, bbox)
+            print(pred)
+            exit()
+
+            progress_bar.update(1)
+            # logs = {"loss": loss.detach().item()}
+            # progress_bar.set_postfix(**logs)
+            pass
+
     
-
-
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PreoperativeSAM model')
     parser.add_argument('--modelname', default='SAM', type=str, help='type of model, e.g., SAM, ...')
