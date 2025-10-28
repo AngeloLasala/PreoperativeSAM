@@ -394,7 +394,6 @@ class IntroperativeiUS(Dataset):
         if self.one_hot_mask:
             assert self.one_hot_mask > 0, 'one_hot_mask must be nonnegative'
             mask = torch.zeros((self.one_hot_mask, mask.shape[1], mask.shape[2])).scatter_(0, mask.long(), 1)
-            print(mask.shape)
 
         # --------- make the point prompt -----------------
         if self.prompt == 'click':
@@ -408,11 +407,11 @@ class IntroperativeiUS(Dataset):
                 class_id = self.class_id
 
             if 'train' in self.split:
-                pt, point_label = random_click(np.array(mask), class_id)
-                bbox = random_bbox(np.array(mask), class_id, self.img_size)
+                pt, point_label = random_click(np.asarray(mask), class_id)
+                bbox = random_bbox(np.asarray(mask), class_id, self.img_size)
             else:
-                pt, point_label = fixed_click(np.array(mask), class_id)
-                bbox = fixed_bbox(np.array(mask), class_id, self.img_size)
+                pt, point_label = fixed_click(np.asarray(mask), class_id)
+                bbox = fixed_bbox(np.asarray(mask), class_id, self.img_size)
 
             mask[mask!=class_id] = 0
             mask[mask==class_id] = 1
@@ -493,7 +492,7 @@ if __name__ == '__main__':
     
     dataset = IntroperativeiUS(main_path = opt.main_path, 
                                 dataset_name = opt.dataset_name, 
-                                split = opt.trainsplit, 
+                                split = opt.train_split, 
                                 joint_transform = transform, 
                                 img_size = opt.img_size,
                                 prompt = "click",
