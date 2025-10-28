@@ -11,6 +11,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
 from torchvision.transforms import functional as F
+from torchvision.transforms import InterpolationMode
 from typing import Callable
 import os
 import cv2
@@ -20,15 +21,42 @@ import json
 import matplotlib.pyplot as plt
 
 def to_long_tensor(pic):
+    """
+    Convert a PIL image or NumPy array into a PyTorch LongTensor.
+
+    This function ensures that the input label or mask is converted 
+    into a tensor of type torch.int64 (LongTensor), which is required 
+    by PyTorch loss functions such as CrossEntropyLoss or NLLLoss 
+    that expect class indices as integer labels (not one-hot or float tensors).
+
+    Parameters:
+    ----------
+        pic (PIL.Image or numpy.ndarray): Input image or mask. 
+            Typically a 2D array where each pixel represents a class index.
+
+    Returns:
+    --------
+        torch.LongTensor: Tensor containing the same data as `pic`, 
+        converted to integer (int64) type.
+    """
     # handle numpy array
     img = torch.from_numpy(np.array(pic, np.uint8))
     # backward compatibility
     return img.long()
 
-
 def correct_dims(*images):
     """
-    Function that uniforms the dimention of input images
+    Function that uniforms the dimention of input images.
+    Grey: (H, W)    -> (H, W, 1)
+    RGB:  (H, W, 3) -> (H, W, 3) 
+
+    Parameters:
+    -----------
+        images: multiple input of images
+
+    Returns:
+    -------
+        corr_images: list of corrected images
     """
     corr_images = []
     # print(images)
@@ -44,6 +72,32 @@ def correct_dims(*images):
 
 
 def random_click(mask, class_id=1):
+    """
+    Generate a random click point on a segmentation mask.
+
+    This function simulates a user click on a segmentation mask for 
+    interactive segmentation tasks. It randomly selects a pixel 
+    coordinate belonging to the specified class (`class_id`). 
+    If no pixel of that class is present in the mask, it instead 
+    selects a pixel from the background (any other class).
+
+    Parameters:
+    -----------
+        mask (numpy.ndarray): 2D array where each pixel value 
+            represents a class index.
+        class_id (int, optional): Class ID to click on. 
+            Defaults to 1.
+
+    Returns:
+    --------
+        tuple:
+            - pt (numpy.ndarray): Array of shape (1, 2) containing 
+              the [x, y] coordinates of the randomly selected point.
+            - point_label (list of int): [1] if the click is on the 
+              target class (positive click), or [0] if it's on another 
+              class (negative click).
+    """
+
     indices = np.argwhere(mask == class_id)
     indices[:, [0,1]] = indices[:, [1,0]]
     point_label = 1
@@ -55,6 +109,9 @@ def random_click(mask, class_id=1):
     return pt[np.newaxis, :], [point_label]
 
 def fixed_click(mask, class_id=1):
+    """
+    Fixed click w/o randomicity
+    """
     indices = np.argwhere(mask == class_id)
     indices[:, [0,1]] = indices[:, [1,0]]
     point_label = 1
@@ -139,7 +196,7 @@ def fixed_bbox(mask, class_id = 1, img_size=256):
 
 class JointTransform2D:
     """
-    Performs augmentation on image and mask when called. Due to the randomness of augmentation transforms,
+    Data augmentation on image and mask. Due to the randomness of augmentation transforms,
     it is not enough to simply apply the same Transform from torchvision on the image and mask separetely.
     Doing this will result in messing up the ground truth mask. To circumvent this problem, this class can
     be used, which will take care of the problems above.
@@ -176,7 +233,7 @@ class JointTransform2D:
         self.ori_size = ori_size
 
     def __call__(self, image, mask):
-        
+
         #  gamma enhancement
         if np.random.rand() < self.p_gama:
             c = 1
@@ -184,19 +241,24 @@ class JointTransform2D:
             # g = 2
             image = (np.power(image / 255, 1.0 / g) / c) * 255
             image = image.astype(np.uint8)
+
         # transforming to PIL image
         image, mask = F.to_pil_image(image), F.to_pil_image(mask)
+
         # random crop
         if self.crop:
             i, j, h, w = T.RandomCrop.get_params(image, self.crop)
             image, mask = F.crop(image, i, j, h, w), F.crop(mask, i, j, h, w)
+
         # random horizontal flip
         if np.random.rand() < self.p_flip:
             image, mask = F.hflip(image), F.hflip(mask)
+
         # random rotation
         if np.random.rand() < self.p_rota:
             angle = T.RandomRotation.get_params((-30, 30))
             image, mask = F.rotate(image, angle), F.rotate(mask, angle)
+
         # random scale and center resize to the original size
         if np.random.rand() < self.p_scale:
             scale = np.random.uniform(1, 1.3)
@@ -206,6 +268,7 @@ class JointTransform2D:
             # mask = F.center_crop(mask, (self.img_size, self.img_size))
             i, j, h, w = T.RandomCrop.get_params(image, (self.img_size, self.img_size))
             image, mask = F.crop(image, i, j, h, w), F.crop(mask, i, j, h, w)
+
         # random add gaussian noise
         if np.random.rand() < self.p_gaussn:
             ns = np.random.randint(3, 15)
@@ -215,25 +278,32 @@ class JointTransform2D:
             image[image > 255] = 255
             image[image < 0] = 0
             image = F.to_pil_image(image.astype('uint8'))
+
         # random change the contrast
         if np.random.rand() < self.p_contr:
             contr_tf = T.ColorJitter(contrast=(0.8, 2.0))
             image = contr_tf(image)
+
         # random distortion
         if np.random.rand() < self.p_distortion:
             distortion = T.RandomAffine(0, None, None, (5, 30))
             image = distortion(image)
-        # color transforms || ONLY ON IMAGE
+
+        # color transforms,  ONLY ON IMAGE
         if self.color_jitter_params:
             image = self.color_tf(image)
+
         # random affine transform
         if np.random.rand() < self.p_random_affine:
             affine_params = T.RandomAffine(180).get_params((-90, 90), (1, 1), (2, 2), (-45, 45), self.crop)
             image, mask = F.affine(image, *affine_params), F.affine(mask, *affine_params)
+
         # transforming to tensor
         image, mask = F.resize(image, (self.img_size, self.img_size), InterpolationMode.BILINEAR), F.resize(mask, (self.ori_size, self.ori_size), InterpolationMode.NEAREST)
         low_mask = F.resize(mask, (self.low_img_size, self.low_img_size), InterpolationMode.NEAREST)
+    
         image = F.to_tensor(image)
+
 
         if not self.long_mask:
             mask = F.to_tensor(mask)
@@ -241,6 +311,7 @@ class JointTransform2D:
         else:
             mask = to_long_tensor(mask)
             low_mask = to_long_tensor(low_mask)
+
         return image, mask, low_mask
 
 
@@ -290,17 +361,17 @@ class IntroperativeiUS(Dataset):
         self.dataset_name = dataset_name
         self.split = split
     
-        # self.one_hot_mask = one_hot_mask
+        self.one_hot_mask = one_hot_mask
         
         self.data_list = self.get_data_list()
 
-        # self.prompt = prompt
-        # self.img_size = img_size
+        self.prompt = prompt
+        self.img_size = img_size
         self.class_id = class_id
         # self.class_dict_file = os.path.join(dataset_path, 'MainPatient/class.json')
         # with open(self.class_dict_file, 'r') as load_f:
         #     self.class_dict = json.load(load_f)
-        if joint_transform:
+        if joint_transform is not None:
             self.joint_transform = joint_transform
         else:
             to_tensor = T.ToTensor()
@@ -311,22 +382,21 @@ class IntroperativeiUS(Dataset):
 
     def __getitem__(self, idx):
         
-        class_id0, image, mask = self.get_image_label(idx)
+        class_id0, image, mask, filename = self.get_image_label(idx)
         
-        # correct dimensions if needed
-        print(image.shape, mask.shape)
+        ## correct dimensions if needed
         image, mask = correct_dims(image, mask)  
-        print(image.shape, mask.shape)
 
-        if self.joint_transform:
-            print('sono qui')
-            image, mask, low_mask = self.joint_transform(image, mask)
-            
+        ## data augmentation on the fly, TO UPDATE ...
+        image, mask, low_mask = self.joint_transform(image, mask)
+        # image, mask = self.joint_transform(image, mask)
+
         if self.one_hot_mask:
             assert self.one_hot_mask > 0, 'one_hot_mask must be nonnegative'
             mask = torch.zeros((self.one_hot_mask, mask.shape[1], mask.shape[2])).scatter_(0, mask.long(), 1)
+            print(mask.shape)
 
-         # --------- make the point prompt -----------------
+        # --------- make the point prompt -----------------
         if self.prompt == 'click':
             point_label = 1
             if 'train' in self.split:
@@ -336,23 +406,23 @@ class IntroperativeiUS(Dataset):
                 class_id = int(class_id0)
             else:
                 class_id = self.class_id
+
             if 'train' in self.split:
                 pt, point_label = random_click(np.array(mask), class_id)
                 bbox = random_bbox(np.array(mask), class_id, self.img_size)
             else:
                 pt, point_label = fixed_click(np.array(mask), class_id)
                 bbox = fixed_bbox(np.array(mask), class_id, self.img_size)
+
             mask[mask!=class_id] = 0
             mask[mask==class_id] = 1
             low_mask[low_mask!=class_id] = 0
             low_mask[low_mask==class_id] = 1
             point_labels = np.array(point_label)
-        if self.one_hot_mask:
-            assert self.one_hot_mask > 0, 'one_hot_mask must be nonnegative'
-            mask = torch.zeros((self.one_hot_mask, mask.shape[1], mask.shape[2])).scatter_(0, mask.long(), 1)
-
+       
         low_mask = low_mask.unsqueeze(0)
         mask = mask.unsqueeze(0)
+
         return {
             'image': image,
             'label': mask,
@@ -376,13 +446,8 @@ class IntroperativeiUS(Dataset):
         image = cv2.imread(img_path, 0)
         mask = cv2.imread(mask_path, 0)
 
-        return self.class_id, image, mask
+        return self.class_id, image, mask, image_info[1]
         
-        
-
-
-
-
 
     def get_data_list(self):
         """
@@ -414,17 +479,48 @@ class IntroperativeiUS(Dataset):
 
 if __name__ == '__main__':
     from preoperativeSAM.cfg import get_config
+    import matplotlib.patches as patches
+
     opt = get_config("PreDura")
+
+    low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
+    encoder_input_size = 256   ## the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS
+
+    transform = JointTransform2D(img_size=encoder_input_size, low_img_size=low_image_size, ori_size=opt.img_size, crop=opt.crop, 
+                                p_flip=0.0, p_rota=0.5, p_scale=0.5, p_gaussn=0.0,
+                                p_contr=0.5, p_gama=0.5, p_distor=0.0, 
+                                color_jitter_params=None, long_mask=True)  
     
-    dataset = IntroperativeiUS(main_path=opt.main_path, 
-                                dataset_name=opt.dataset_name, 
-                                split=opt.train_split, 
-                                # joint_transform=JointTransform2D(img_size=opt.img_size, crop=opt.crop, p_flip=0.5, p_rota=0.5, p_scale=0.5, p_gaussn=0.5, p_contr=0.5, p_gama=0.5, p_distor=0.5),
-                                img_size=opt.img_size,
-                                prompt="click",
-                                class_id=1,
-                                one_hot_mask=opt.classes)
-    for image, mask in dataset:
-        if np.sum(mask) > 0 :
-            print('ok')
-        else: print('no mask')
+    dataset = IntroperativeiUS(main_path = opt.main_path, 
+                                dataset_name = opt.dataset_name, 
+                                split = opt.trainsplit, 
+                                joint_transform = transform, 
+                                img_size = opt.img_size,
+                                prompt = "click",
+                                class_id = 1)
+    
+    idx = np.random.randint(0,100)
+    for i in range(10):
+        data = dataset[idx]
+         
+        ig, axes = plt.subplots(1, 3, figsize=(10, 5), num=i)
+        axes[0].imshow(data['image'][0], cmap='gray')
+        axes[0].set_title("Immagine")
+        # axes[0].axis('off')
+
+        axes[1].imshow(data['image'][0], cmap='gray')
+        axes[1].imshow(data['label'][0], alpha=0.2, cmap='jet')
+        ## click
+        x, y = data["pt"][0] 
+        axes[1].scatter(x, y, c='red', s=80, marker='x', label='Click') 
+        x_min, y_min, x_max, y_max = data["bbox"]
+        ## bbox
+        rect2 = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min,
+                              linewidth=2, edgecolor='red', facecolor='none', label='BBox')
+        axes[1].add_patch(rect2)
+        axes[1].set_title("Immagine + Maschera")
+        # axes[1].axis('off')
+
+        axes[2].imshow(data['low_mask'][0], cmap='gray')
+        axes[2].set_title("Immagine")
+    plt.show()
