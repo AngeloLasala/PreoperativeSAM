@@ -132,6 +132,7 @@ class Sam(nn.Module):
 
 
     def forward(
+      
         self, 
         imgs: torch.Tensor,
         pt: Tuple[torch.Tensor, torch.Tensor],  # [b n 2, b n]
