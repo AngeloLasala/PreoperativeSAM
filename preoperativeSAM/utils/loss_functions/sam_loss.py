@@ -212,7 +212,7 @@ def get_criterion(modelname='SAM', opt=None):
         nn.Module: A PyTorch loss function corresponding to the selected model type.
     """
     device = torch.device(opt.device)
-    pos_weight = torch.ones([1]).cuda(device=device)*2     # to get more attention to positive pixel in BCE
+    pos_weight = torch.ones([1]).cuda(device=device) * 2   # to get more attention to positive pixel in BCE
 
     if modelname == "SAMed":
         criterion = DC_and_BCE_loss(classes=opt.classes)
@@ -220,5 +220,5 @@ def get_criterion(modelname='SAM', opt=None):
         criterion = Mask_BCE_loss(pos_weight=pos_weight)
     else:
         criterion = Mask_DC_and_BCE_loss(pos_weight=pos_weight)
-        
+
     return criterion
