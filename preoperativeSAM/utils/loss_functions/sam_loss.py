@@ -188,12 +188,37 @@ class Mask_BCE_loss(nn.Module):
         return loss
 
 def get_criterion(modelname='SAM', opt=None):
+    """
+    Returns the appropriate loss function based on the specified model type.
+
+    This function selects and initializes the training loss criterion according to the
+    given model name. It supports different combinations of Dice Loss and Binary 
+    Cross-Entropy (BCE) Loss, and can apply class reweighting through the `pos_weight`
+    parameter to handle class imbalance (e.g., when positive samples are rare).
+
+    Parameters:
+    -----------
+        modelname (str): The name of the model. Possible values include:
+            - "SAMed": Uses a combination of Dice and Cross-Entropy loss (`DC_and_BCE_loss`).
+            - "MSA": Uses only weighted Binary Cross-Entropy loss (`Mask_BCE_loss`).
+            - Any other value: Uses a combination of Dice and BCE loss for mask prediction
+              (`Mask_DC_and_BCE_loss`).
+        opt (object): An options or configuration object containing model parameters such as:
+            - `opt.device` (str): The computation device ("cpu" or "cuda").
+            - `opt.classes` (int): Number of output classes (used for `SAMed` models).
+
+    Returns:
+    -------
+        nn.Module: A PyTorch loss function corresponding to the selected model type.
+    """
     device = torch.device(opt.device)
-    pos_weight = torch.ones([1]).cuda(device=device)*2
+    pos_weight = torch.ones([1]).cuda(device=device)*2     # to get more attention to positive pixel in BCE
+
     if modelname == "SAMed":
         criterion = DC_and_BCE_loss(classes=opt.classes)
     elif modelname == "MSA":
         criterion = Mask_BCE_loss(pos_weight=pos_weight)
     else:
         criterion = Mask_DC_and_BCE_loss(pos_weight=pos_weight)
+        
     return criterion
