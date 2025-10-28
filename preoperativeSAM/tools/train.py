@@ -4,13 +4,22 @@ Main train script for PreoperativeSAM.
 import argparse
 import os
 import torch
+import torchvision
+from torch import nn
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+import torch.optim as optim
 import numpy as np
+import torch
+from torch.utils.tensorboard import SummaryWriter
+import time
 import random
 import logging
 
 from preoperativeSAM.cfg import get_config
 from preoperativeSAM.models.model_dict import get_model
 from preoperativeSAM.utils.visualization import get_model_parameters
+from preoperativeSAM.dataset.dataset import JointTransform2D, IntroperativeiUS
 
 
 def main(args):
@@ -45,18 +54,80 @@ def main(args):
     torch.backends.cudnn.deterministic = True         # set random seed for convolution
 
     ## get the model  ##############################################################
-    logging.info(f" Creating model: {args.modelname}")
+    logging.info(f" Creating model: {args.modelname} ...")
     model = get_model(modelname=args.modelname, args=args, opt=opt)
-    model.to(device)
-    get_model_parameters(model)
+    logging.info(' Done!\n')
 
     ## load the dataset  ##########################################################
+    opt.batch_size = args.batch_size * args.n_gpu
+
+    logging.info(' Creating train and val dataloader...')
+    tf_train = JointTransform2D(img_size=args.encoder_input_size, low_img_size=args.low_image_size, ori_size=opt.img_size, crop=opt.crop, 
+                                p_flip=0.0, p_rota=0.5, p_scale=0.5, p_gaussn=0.0,
+                                p_contr=0.5, p_gama=0.5, p_distor=0.0, color_jitter_params=None, long_mask=True)  # image reprocessing
+    tf_val = JointTransform2D(img_size=args.encoder_input_size, low_img_size=args.low_image_size, ori_size=opt.img_size, crop=opt.crop,
+                             p_flip=0, color_jitter_params=None, long_mask=True)
+    train_dataset = IntroperativeiUS(main_path = opt.main_path, 
+                                    dataset_name = opt.dataset_name, 
+                                    split = opt.train_split, 
+                                    joint_transform = tf_train, 
+                                    img_size = args.encoder_input_size)
+    val_dataset = IntroperativeiUS(main_path = opt.main_path, 
+                                    dataset_name = opt.dataset_name, 
+                                    split = opt.val_split, 
+                                    joint_transform = tf_val, 
+                                    img_size = args.encoder_input_size)  # return image, mask, and filename
+    trainloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    valloader = DataLoader(val_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=8, pin_memory=True)
+    logging.info(' Done!\n')
+
+    ## Train initialization ########################################################################
+    logging.info(' Train initialization...')
+    logging.info(f'  - device: {device}')
+    logging.info(f'  - load pre-trained model: {opt.pre_trained}')
+    logging.info(f'  - base lr: {args.base_lr}')
+    logging.info(f'  - warmup: {args.warmup}')
+
+    model.to(device)
+    get_model_parameters(model)
+    if opt.pre_trained:
+        checkpoint = torch.load(opt.load_path)
+        new_state_dict = {}
+        for k,v in checkpoint.items():
+            if k[:7] == 'module.':
+                new_state_dict[k[7:]] = v
+            else:
+                new_state_dict[k] = v
+        model.load_state_dict(new_state_dict)
+      
+    if args.n_gpu > 1:
+        model = nn.DataParallel(model)
+    
+    if args.warmup:
+        logging.info(f'  - warmup perido: {args.warmup_period}')
+        b_lr = args.base_lr / args.warmup_period
+        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=b_lr, betas=(0.9, 0.999), weight_decay=0.1)
+    else:
+        b_lr = args.base_lr
+        optimizer = optim.Adam(model.parameters(), lr=args.base_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+   
+    # criterion = get_criterion(modelname=args.modelname, opt=opt)
+    logging.info(' Done!\n')
+
+    
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PreoperativeSAM model')
     parser.add_argument('--modelname', default='SAM', type=str, help='type of model, e.g., SAM, ...')
+    parser.add_argument('--encoder_input_size', type=int, default=256, help='the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS')
+    parser.add_argument('--low_image_size', type=int, default=128, help='the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS')
     parser.add_argument('--task', default='PreDura', help='task or dataset name')
+    parser.add_argument('--batch_size', type=int, default=4, help='batch_size per gpu') # SAMed is 12 bs with 2n_gpu and lr is 0.005
+    parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
+    parser.add_argument('--base_lr', type=float, default=0.0005, help='segmentation network learning rate, 0.005 for SAMed, 0.0001 for MSA') #0.0006
+    parser.add_argument('--warmup', action='store_true', help='If activated, warp up the learning from a lower lr to the base_lr, default=False') 
+    parser.add_argument('--warmup_period', type=int, default=250, help='Warp up iterations, only valid whrn warmup is activated')
     parser.add_argument('--log', type=str, default='debug', help='Logging level')
     args = parser.parse_args()    
     
