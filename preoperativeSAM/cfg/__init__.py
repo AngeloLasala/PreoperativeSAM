@@ -7,11 +7,11 @@ class PreDura:
     dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
     save_folder = "checkpoints"
     result_folder = "results"
-    tensorboard_foldeer = "tensorboard"
+    tensorboard_folder = "tensorboard"
 
     ## Training parameters    ##########################################################
     workers = 1                         # number of data loading workers (default: 8)
-    epochs = 200                        # number of total epochs to run (default: 400)
+    epochs = 10                        # number of total epochs to run (default: 400)
     batch_size = 4                      # batch size (default: 4)
     learning_rate = 5e-4                # iniial learning rate (default: 0.001)
     momentum = 0.9                      # momntum
