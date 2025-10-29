@@ -24,6 +24,7 @@ from preoperativeSAM.models.model_dict import get_model
 from preoperativeSAM.utils.visualization import get_model_parameters
 from preoperativeSAM.utils.loss_functions.sam_loss import get_criterion
 from preoperativeSAM.utils.generate_prompts import get_click_prompt
+from preoperativeSAM.utils.evaluation import get_eval
 from preoperativeSAM.dataset.dataset import JointTransform2D, IntroperativeiUS
 
 
@@ -178,6 +179,36 @@ def main(args):
             TensorWriter.add_scalar('train_loss', train_losses / (batch_idx + 1), epoch)
             TensorWriter.add_scalar('learning rate', optimizer.state_dict()['param_groups'][0]['lr'], epoch)
             loss_log[epoch] = train_losses / (batch_idx + 1)
+
+        ## evaluation
+        if epoch % opt.eval_freq == 0:
+            model.eval()
+            dices, mean_dice, _, val_losses = get_eval(valloader, model, criterion=criterion, opt=opt, args=args)
+            print('epoch [{}/{}], val loss:{:.4f}'.format(epoch, opt.epochs, val_losses))
+            print('epoch [{}/{}], val dice:{:.4f}'.format(epoch, opt.epochs, mean_dice))
+            if args.keep_log:
+                TensorWriter.add_scalar('val_loss', val_losses, epoch)
+                TensorWriter.add_scalar('dices', mean_dice, epoch)
+                dice_log[epoch] = mean_dice
+        #     if mean_dice > best_dice:
+        #         best_dice = mean_dice
+        #         timestr = time.strftime('%m%d%H%M')
+        #         if not os.path.isdir(opt.save_path):
+        #             os.makedirs(opt.save_path)
+        #         save_path = opt.save_path + args.modelname + opt.save_path_code + '%s' % timestr + '_' + str(epoch) + '_' + str(best_dice)
+        #         torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
+        # if epoch % opt.save_freq == 0 or epoch == (opt.epochs-1):
+        #     if not os.path.isdir(opt.save_path):
+        #         os.makedirs(opt.save_path)
+        #     save_path = opt.save_path + args.modelname + opt.save_path_code + '_' + str(epoch)
+        #     torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
+        #     if args.keep_log:
+        #         with open(opt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/trainloss.txt', 'w') as f:
+        #             for i in range(len(loss_log)):
+        #                 f.write(str(loss_log[i])+'\n')
+        #         with open(opt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/dice.txt', 'w') as f:
+        #             for i in range(len(dice_log)):
+        #                 f.write(str(dice_log[i])+'\n')
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PreoperativeSAM model')
