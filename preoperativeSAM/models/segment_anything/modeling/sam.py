@@ -132,56 +132,31 @@ class Sam(nn.Module):
 
 
     def forward(
-      
         self, 
         imgs: torch.Tensor,
         pt: Tuple[torch.Tensor, torch.Tensor],  # [b n 2, b n]
         bbox: torch.Tensor=None, # b 4
     ) -> torch.Tensor:
+        input_images = torch.stack([self.preprocess(x) for x in imgs], dim=0)
+        image_embeddings = self.image_encoder(input_images)
+        
+        se, de = self.prompt_encoder(            # se b 2 256, de b 256 32 32
+                      points=pt,
+                      boxes=None,
+                      masks=None,
+                  )
+        low_res_masks, _ = self.mask_decoder( # low_res_mask b 1 128 128
+                  image_embeddings=image_embeddings,
+                  image_pe=self.prompt_encoder.get_dense_pe(), 
+                  sparse_prompt_embeddings=se,
+                  dense_prompt_embeddings=de, 
+                  multimask_output=False,
+                  )
+        masks = F.interpolate(low_res_masks, (256, 256), mode="bilinear", align_corners=False)
+        outputs = {"low_res_logits": low_res_masks, "masks": masks}
+        return outputs
 
-        imge = self.image_encoder(imgs)
-        if len(pt[0].shape) == 3:
-          se, de = self.prompt_encoder(            # se b 2 256, de b 256 32 32
-                        points=pt,
-                        boxes=None,
-                        masks=None,
-                    )
-          low_res_masks, _ = self.mask_decoder( # low_res_mask b 1 128 128
-                    image_embeddings=imge,
-                    image_pe=self.prompt_encoder.get_dense_pe(), 
-                    sparse_prompt_embeddings=se,
-                    dense_prompt_embeddings=de, 
-                    multimask_output=False,
-                    )
-          masks = F.interpolate(low_res_masks, (256, 256), mode="bilinear", align_corners=False)
-          outputs = {"low_res_logits": low_res_masks, "masks": masks}
-          return outputs
-
-        else:
-          low_res_masks, masks = [], []
-          for i in range(pt[0].shape[1]):
-            pti = (pt[0][:, i, :, :], pt[1][:, i, :])
-            sei, dei = self.prompt_encoder(            # se b 2 256, de b 256 32 32
-                        points=pti,
-                        boxes=None,
-                        masks=None,
-                    )
-            low_res_masksi, _ = self.mask_decoder( # low_res_mask b 1 128 128
-                    image_embeddings=imge,
-                    image_pe=self.prompt_encoder.get_dense_pe(), 
-                    sparse_prompt_embeddings=sei,
-                    dense_prompt_embeddings=dei, 
-                    multimask_output=False,
-                    )
-            masksi = F.interpolate(low_res_masksi, (256, 256), mode="bilinear", align_corners=False)
-            low_res_masks.append(low_res_masksi)
-            masks.append(masksi)
-          low_res_masks = torch.stack(low_res_masks, dim=1)
-          masks = torch.stack(masks, dim=1) # b c 1 255 255
-          masks = masks.reshape(masks.shape[0], -1, masks.shape[3], masks.shape[4])
-          low_res_masks = low_res_masks.reshape(low_res_masks.shape[0], -1, low_res_masks.shape[3], low_res_masks.shape[4])
-          outputs = {"low_res_logits": low_res_masks, "masks": masks}
-          return outputs
+      
 
 
     def postprocess_masks(

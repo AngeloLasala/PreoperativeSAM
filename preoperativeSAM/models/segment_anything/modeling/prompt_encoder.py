@@ -55,7 +55,7 @@ class PromptEncoder(nn.Module):
             nn.Conv2d(mask_in_chans // 4, mask_in_chans, kernel_size=2, stride=2),
             LayerNorm2d(mask_in_chans),
             activation(),
-            nn.Conv2d(mask_in_chans, embed_dim, kernel_size=1),
+            nn.Conv2d(mask_in_chans, embed_dim, kernel_size=1, stride=2),
         )
         self.no_mask_embed = nn.Embedding(1, embed_dim)
 

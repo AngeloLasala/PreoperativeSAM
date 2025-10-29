@@ -121,9 +121,13 @@ class MaskDecoder(nn.Module):
         output_tokens = torch.cat([self.iou_token.weight, self.mask_tokens.weight], dim=0)
         output_tokens = output_tokens.unsqueeze(0).expand(sparse_prompt_embeddings.size(0), -1, -1)
         tokens = torch.cat((output_tokens, sparse_prompt_embeddings), dim=1)
-
+        
         # Expand per-image data in batch direction to be per-mask
-        src = torch.repeat_interleave(image_embeddings, tokens.shape[0], dim=0)
+        if len(image_embeddings.shape) == 3:
+            image_embeddings =  image_embeddings.unsqueeze(0)
+            src = torch.repeat_interleave(image_embeddings, tokens.shape[0], dim=0) # b 256 32 32 when the decoder operated in bs=1
+        else:
+            src = image_embeddings
         src = src + dense_prompt_embeddings
         pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
         b, c, h, w = src.shape

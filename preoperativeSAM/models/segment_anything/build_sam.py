@@ -60,9 +60,10 @@ def _build_sam(
     checkpoint=None,
 ):
     prompt_embed_dim = 256
-    image_size = 1024
-    vit_patch_size = 16
+    image_size = 256
+    vit_patch_size = image_size // 32
     image_embedding_size = image_size // vit_patch_size
+
     sam = Sam(
         image_encoder=ImageEncoderViT(
             depth=encoder_depth,
@@ -105,3 +106,6 @@ def _build_sam(
             state_dict = torch.load(f)
         sam.load_state_dict(state_dict)
     return sam
+
+
+

@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     dummy_input = [
     {
-        "image": torch.randn(3, 256, 256),  # 3xHxW immagine random
+        "image": torch.randn(1, 256, 256),  # 3xHxW immagine random
         "original_size": (256, 256),
         "point_coords": torch.tensor([[[100, 150], [400, 500]]], dtype=torch.float32),  # 1 batch, 2 punti
         "point_labels": torch.tensor([[1, 0]], dtype=torch.int64),  # 1 batch, 2 label
