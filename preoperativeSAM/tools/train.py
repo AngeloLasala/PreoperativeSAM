@@ -42,11 +42,19 @@ def main(args):
     ## set logging level  ###########################################################
     logging_dict = {'debug':logging.DEBUG, 'info':logging.INFO, 'warning':logging.WARNING, 'error':logging.ERROR, 'critical':logging.CRITICAL}
     logging.basicConfig(level=logging_dict[args.log])
-    
 
-    ## set opt and device  ##################################################################
+
+    ## set opt and device and logging folder ##################################################################
     opt = get_config(args.task)
     device = torch.device(opt.device)
+
+    if args.keep_log:
+        logtimestr = time.strftime('%d-%m-%Y_%H-%M')  # initialize the tensorboard for record the training process
+        print(logtimestr)
+        boardpath = os.path.join(opt.main_path, opt.tensorboard_folder, opt.dataset_name, args.modelname, logtimestr)
+        if not os.path.isdir(boardpath):
+            os.makedirs(boardpath)
+        TensorWriter = SummaryWriter(boardpath)
 
     ## set random seed for reproducibility  #######################################
     seed_value = opt.seed           
@@ -139,15 +147,37 @@ def main(args):
 
             ## forward
             pred = model(imgs, pt, bbox)
-            print(pred)
-            exit()
+            train_loss = criterion(pred, masks)
+            
+            ## backward
+            optimizer.zero_grad()
+            train_loss.backward()
+            optimizer.step()
+            train_losses += train_loss.item()
+            
+
+            ## adjust learning rate if need
+            if args.warmup and iter_num < args.warmup_period:
+                lr_ = args.base_lr * ((iter_num + 1) / args.warmup_period)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = lr_
+            else:
+                if args.warmup:
+                    shift_iter = iter_num - args.warmup_period
+                    assert shift_iter >= 0, f'Shift iter is {shift_iter}, smaller than zero'
+                    lr_ = args.base_lr * (1.0 - shift_iter / max_iterations) ** 0.9  # learning rate adjustment depends on the max iterations
+                    for param_group in optimizer.param_groups:
+                        param_group['lr'] = lr_
+            iter_num = iter_num + 1
 
             progress_bar.update(1)
-            # logs = {"loss": loss.detach().item()}
-            # progress_bar.set_postfix(**logs)
-            pass
+            logs = {"loss": train_loss.detach().item()}
+            progress_bar.set_postfix(**logs)
 
-    
+        if args.keep_log:
+            TensorWriter.add_scalar('train_loss', train_losses / (batch_idx + 1), epoch)
+            TensorWriter.add_scalar('learning rate', optimizer.state_dict()['param_groups'][0]['lr'], epoch)
+            loss_log[epoch] = train_losses / (batch_idx + 1)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PreoperativeSAM model')
@@ -161,6 +191,8 @@ if __name__ == '__main__':
     parser.add_argument('--warmup', action='store_true', help='If activated, warp up the learning from a lower lr to the base_lr, default=False') 
     parser.add_argument('--warmup_period', type=int, default=250, help='Warp up iterations, only valid whrn warmup is activated')
     parser.add_argument('--log', type=str, default='debug', help='Logging level')
+    parser.add_argument('--keep_log', action='store_true', help='keep the loss&lr&dice during training or not, default=False')
+
     args = parser.parse_args()    
     
     main(args)
