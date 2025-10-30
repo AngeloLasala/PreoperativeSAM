@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from hausdorff import hausdorff_distance
 import time
 import pandas as pd
+import logging
 
 from preoperativeSAM.utils.generate_prompts import get_click_prompt
 import preoperativeSAM.utils.metrics as metrics
@@ -94,12 +95,17 @@ def eval_mask_slice(valloader, model, criterion, opt, args):
 
 
 def eval_mask_slice2(valloader, model, criterion, opt, args):
+    """
+    Evaluate mask slice by slice
+    """
     model.eval()
+    
     val_losses, mean_dice = 0, 0
     max_slice_number = opt.batch_size * (len(valloader) + 1)
     dices = np.zeros((max_slice_number, opt.classes))
     hds = np.zeros((max_slice_number, opt.classes))
     ious, accs, ses, sps = np.zeros((max_slice_number, opt.classes)), np.zeros((max_slice_number, opt.classes)), np.zeros((max_slice_number, opt.classes)), np.zeros((max_slice_number, opt.classes))
+    
     eval_number = 0
     sum_time = 0
     for batch_idx, (datapack) in enumerate(valloader):
@@ -108,7 +114,7 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
         label = Variable(datapack['label'].to(dtype = torch.float32, device=opt.device))
         class_id = datapack['class_id']
         image_filename = datapack['image_name']
-
+        
         pt = get_click_prompt(datapack, opt)
 
         with torch.no_grad():
@@ -120,7 +126,7 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
         val_losses += val_loss.item()
 
         if args.modelname == 'MSA' or args.modelname == 'SAM':
-            gt = masks.detach().cpu().numpy()
+            gt = label.detach().cpu().numpy()     ## here I change to get always 256*256 gt
         else:
             gt = label.detach().cpu().numpy()
         gt = gt[:, 0, :, :]
@@ -158,7 +164,7 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
 
     mean_dice = np.mean(dice_mean[1:])
     mean_hdis = np.mean(hd_mean[1:])
-    print("test speed", eval_number/sum_time)
+    logging.info(f" test speed : {eval_number/sum_time:.4}")
     if opt.mode == "train":
         return dices, mean_dice, mean_hdis, val_losses
     else:

@@ -17,6 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 import time
 import random
 import logging
+logging.getLogger("numba").setLevel(logging.WARNING)
 from tqdm import tqdm
 
 from preoperativeSAM.cfg import get_config
@@ -51,8 +52,7 @@ def main(args):
 
     if args.keep_log:
         logtimestr = time.strftime('%d-%m-%Y_%H-%M')  # initialize the tensorboard for record the training process
-        print(logtimestr)
-        boardpath = os.path.join(opt.main_path, opt.tensorboard_folder, opt.dataset_name, args.modelname, logtimestr)
+        boardpath = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.tensorboard_folder, opt.dataset_name, logtimestr)
         if not os.path.isdir(boardpath):
             os.makedirs(boardpath)
         TensorWriter = SummaryWriter(boardpath)
@@ -184,31 +184,34 @@ def main(args):
         if epoch % opt.eval_freq == 0:
             model.eval()
             dices, mean_dice, _, val_losses = get_eval(valloader, model, criterion=criterion, opt=opt, args=args)
-            print('epoch [{}/{}], val loss:{:.4f}'.format(epoch, opt.epochs, val_losses))
-            print('epoch [{}/{}], val dice:{:.4f}'.format(epoch, opt.epochs, mean_dice))
+            logging.info(f' epoch [{epoch}/{opt.epochs}], val loss:{val_losses:.4f}')
+            logging.info(f' epoch [{epoch}/{opt.epochs}], val dice:{mean_dice:.4f}')
             if args.keep_log:
                 TensorWriter.add_scalar('val_loss', val_losses, epoch)
                 TensorWriter.add_scalar('dices', mean_dice, epoch)
                 dice_log[epoch] = mean_dice
-        #     if mean_dice > best_dice:
-        #         best_dice = mean_dice
-        #         timestr = time.strftime('%m%d%H%M')
-        #         if not os.path.isdir(opt.save_path):
-        #             os.makedirs(opt.save_path)
-        #         save_path = opt.save_path + args.modelname + opt.save_path_code + '%s' % timestr + '_' + str(epoch) + '_' + str(best_dice)
-        #         torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
-        # if epoch % opt.save_freq == 0 or epoch == (opt.epochs-1):
-        #     if not os.path.isdir(opt.save_path):
-        #         os.makedirs(opt.save_path)
-        #     save_path = opt.save_path + args.modelname + opt.save_path_code + '_' + str(epoch)
-        #     torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
-        #     if args.keep_log:
-        #         with open(opt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/trainloss.txt', 'w') as f:
-        #             for i in range(len(loss_log)):
-        #                 f.write(str(loss_log[i])+'\n')
-        #         with open(opt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/dice.txt', 'w') as f:
-        #             for i in range(len(dice_log)):
-        #                 f.write(str(dice_log[i])+'\n')
+
+            if mean_dice > best_dice:
+                best_dice = mean_dice
+                timestr = time.strftime('%m%d%H%M')
+                save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
+                if not os.path.isdir(save_path):
+                    os.makedirs(save_path)
+                save_path = os.path.join(save_path, f'{args.modelname}_best')
+                torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
+        if epoch == (opt.epochs-1):
+            save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
+            if not os.path.isdir(save_path):
+                os.makedirs(save_path)
+            save_path = os.path.join(save_path, f'{args.modelname}_last')
+            torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
+            # if args.keep_log:
+            #     with open(os.path.joiopt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/trainloss.txt', 'w') as f:
+            #         for i in range(len(loss_log)):
+            #             f.write(str(loss_log[i])+'\n')
+            #     with open(opt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/dice.txt', 'w') as f:
+            #         for i in range(len(dice_log)):
+            #             f.write(str(dice_log[i])+'\n')
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PreoperativeSAM model')
@@ -220,10 +223,10 @@ if __name__ == '__main__':
     parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
     parser.add_argument('--base_lr', type=float, default=0.0005, help='segmentation network learning rate, 0.005 for SAMed, 0.0001 for MSA') #0.0006
     parser.add_argument('--warmup', action='store_true', help='If activated, warp up the learning from a lower lr to the base_lr, default=False') 
-    parser.add_argument('--warmup_period', type=int, default=250, help='Warp up iterations, only valid whrn warmup is activated')
+    parser.add_argument('--warmup_period', type=int, default=250, help='Warp up iterations, only valid when warmup is activated')
     parser.add_argument('--log', type=str, default='debug', help='Logging level')
     parser.add_argument('--keep_log', action='store_true', help='keep the loss&lr&dice during training or not, default=False')
 
-    args = parser.parse_args()    
+    args = parser.parse_args()
     
     main(args)
