@@ -8,11 +8,12 @@ class PreDura:
     save_folder = "checkpoints"
     result_folder = "results"
     tensorboard_folder = "tensorboard"
+    sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
 
     ## Training parameters    ##########################################################
     workers = 1                         # number of data loading workers (default: 8)
     epochs = 10                        # number of total epochs to run (default: 400)
-    batch_size = 4                      # batch size (default: 4)
+    batch_size = 8                      # batch size (default: 4)
     learning_rate = 5e-4                # iniial learning rate (default: 0.001)
     momentum = 0.9                      # momntum
     classes = 2                         # then umber of classes (background + foreground)
