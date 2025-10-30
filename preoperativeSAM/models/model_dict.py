@@ -2,11 +2,17 @@
 Ausiliar file to load different models
 """
 from preoperativeSAM.models.segment_anything.build_sam import sam_model_registry
+from preoperativeSAM.models.segment_anything_samus.build_sam_us import samus_model_registry
 from preoperativeSAM.utils.visualization import get_model_parameters
+import os
 
 def get_model(modelname="SAM", args=None, opt=None):
     if modelname == "SAM":
-        model = sam_model_registry['vit_b'](checkpoint=None)
+        model = sam_model_registry['vit_b'](checkpoint = os.path.join(opt.main_path, opt.sam_ckpt))
+
+    elif modelname == "SAMUS":
+        model = samus_model_registry['vit_b'](args=args, checkpoint = os.path.join(opt.main_path, opt.sam_ckpt))
+    
     ## here you can add more models if needed
     else:
         raise RuntimeError("Could not find the model:", modelname)
@@ -14,9 +20,13 @@ def get_model(modelname="SAM", args=None, opt=None):
 
 if __name__ == "__main__":
     import torch
+    import logging
+    logging.basicConfig(level=logging.INFO)
 
+    print('SAM')
     model = get_model("SAM", args=None, opt=None)
     get_model_parameters(model)
+    print()
 
     dummy_input = [
     {
@@ -30,5 +40,14 @@ if __name__ == "__main__":
     ]
 
     # Esegui il forward pass
-    outputs = model(dummy_input, multimask_output=True)
-    print("Output keys:", outputs[0].keys())
+    # outputs = model(dummy_input, multimask_output=True)
+    # print("Output keys:", outputs[0].keys())
+    print('SAMUS')
+    class args_samus:
+        encoder_input_size = 256
+
+    model = get_model("SAMUS", args=args_samus, opt=None)
+    get_model_parameters(model)
+    image_encoder = model.image_encoder
+    get_model_parameters(image_encoder)
+    print()

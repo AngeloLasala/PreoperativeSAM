@@ -184,8 +184,8 @@ def main(args):
         if epoch % opt.eval_freq == 0:
             model.eval()
             dices, mean_dice, _, val_losses = get_eval(valloader, model, criterion=criterion, opt=opt, args=args)
-            logging.info(f' epoch [{epoch}/{opt.epochs}], val loss:{val_losses:.4f}')
-            logging.info(f' epoch [{epoch}/{opt.epochs}], val dice:{mean_dice:.4f}')
+            logging.info(f' epoch [{epoch+1}/{opt.epochs}], val loss:{val_losses:.4f}')
+            logging.info(f' epoch [{epoch+1}/{opt.epochs}], val dice:{mean_dice:.4f}')
             if args.keep_log:
                 TensorWriter.add_scalar('val_loss', val_losses, epoch)
                 TensorWriter.add_scalar('dices', mean_dice, epoch)
