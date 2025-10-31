@@ -24,7 +24,15 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     print('SAM')
-    model = get_model("SAM", args=None, opt=None)
+    class args_sam:
+        main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
+        dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
+        save_folder = "checkpoints"
+        result_folder = "results"
+        tensorboard_folder = "tensorboard"
+        sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
+
+    model = get_model("SAM", args=None, opt=args_sam)
     get_model_parameters(model)
     print()
 
@@ -40,8 +48,9 @@ if __name__ == "__main__":
     ]
 
     # Esegui il forward pass
-    # outputs = model(dummy_input, multimask_output=True)
-    # print("Output keys:", outputs[0].keys())
+    outputs = model(dummy_input, multimask_output=True)
+    print("Output keys:", outputs[0].keys())
+
     print('SAMUS')
     class args_samus:
         encoder_input_size = 256

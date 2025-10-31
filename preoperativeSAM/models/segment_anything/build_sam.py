@@ -9,6 +9,7 @@ import torch
 from functools import partial
 
 from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Sam, TwoWayTransformer
+import logging
 
 
 def build_sam_vit_h(checkpoint=None):
@@ -60,8 +61,8 @@ def _build_sam(
     checkpoint=None,
 ):
     prompt_embed_dim = 256
-    image_size = 256
-    vit_patch_size = image_size // 32
+    image_size = 1024
+    vit_patch_size = 16
     image_embedding_size = image_size // vit_patch_size
 
     sam = Sam(
@@ -102,6 +103,7 @@ def _build_sam(
     )
     sam.eval()
     if checkpoint is not None:
+        logging.info(f' pretrained SAM at path {checkpoint}')
         with open(checkpoint, "rb") as f:
             state_dict = torch.load(f)
         sam.load_state_dict(state_dict)

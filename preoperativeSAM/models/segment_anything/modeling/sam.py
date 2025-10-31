@@ -51,7 +51,7 @@ class Sam(nn.Module):
         return self.pixel_mean.device
 
     @torch.no_grad()
-    def forward_sam(
+    def forward(
         self,
         batched_input: List[Dict[str, Any]],
         multimask_output: bool,
@@ -131,7 +131,7 @@ class Sam(nn.Module):
         return outputs
 
 
-    def forward(
+    def forward_new(
         self, 
         imgs: torch.Tensor,
         pt: Tuple[torch.Tensor, torch.Tensor],  # [b n 2, b n]
