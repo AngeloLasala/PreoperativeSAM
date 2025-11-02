@@ -19,6 +19,8 @@ import random
 import logging
 logging.getLogger("numba").setLevel(logging.WARNING)
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 from preoperativeSAM.cfg import get_config
 from preoperativeSAM.models.model_dict import get_model
@@ -187,10 +189,41 @@ def main(args):
             logging.info(f' epoch [{epoch+1}/{opt.epochs}], val loss:{val_losses:.4f}')
             logging.info(f' epoch [{epoch+1}/{opt.epochs}], val dice:{mean_dice:.4f}')
             if args.keep_log:
+                ## logger scalar
                 TensorWriter.add_scalar('val_loss', val_losses, epoch)
                 TensorWriter.add_scalar('dices', mean_dice, epoch)
                 dice_log[epoch] = mean_dice
 
+                #logger images
+                idxv = np.random.randint(0, len(val_dataset))
+                datapack = val_dataset[idxv]
+                imgs = datapack['image'].unsqueeze(0).to(dtype=torch.float32, device=opt.device)
+                label = datapack['label'].unsqueeze(0).to(dtype=torch.float32, device=opt.device)
+
+                pt = get_click_prompt(datapack, opt)
+
+                with torch.no_grad():
+                    pred = model(imgs, pt)
+
+                predict = torch.sigmoid(pred['masks'])
+                pred = predict.detach().cpu().numpy()[0, 0, :, :]  # (b, c, h, w)
+
+                fig, axes = plt.subplots(1, 3, figsize=(10, 5))
+                axes[0].imshow(datapack['image'][0], cmap='gray')
+                axes[0].set_title("Imm")
+
+                axes[1].imshow(datapack['label'][0], cmap='gray')
+                x, y = datapack["pt"][0]
+                axes[1].scatter(x, y, c='red', s=80, marker='x', label='Click')
+                axes[1].set_title("Label + pt")
+
+                axes[2].imshow(pred, cmap='gray')
+                axes[2].scatter(x, y, c='red', s=80, marker='x', label='Click')
+                axes[2].set_title("Pred + pt")
+
+                TensorWriter.add_figure('Image', fig, epoch)
+
+       
             if mean_dice > best_dice:
                 best_dice = mean_dice
                 timestr = time.strftime('%m%d%H%M')
