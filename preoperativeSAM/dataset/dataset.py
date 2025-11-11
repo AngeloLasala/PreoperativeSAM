@@ -318,7 +318,7 @@ class JointTransform2D:
 class IntroperativeiUS(Dataset):
     """
     Dataset class for Intraoprerative iUS segmentation. The structure of the folder is compatible with 
-    future direction of the project, i.e., usingi preopreative information for guiding segmentation. 
+    future direction of the project, i.e., using preopreative information for guiding segmentation. 
     In line with this goal the dataset is structured in 'subjects' folders
 
     Folder structure:
@@ -474,12 +474,212 @@ class IntroperativeiUS(Dataset):
 
         return data_list
 
+class PrePostiUS(Dataset):
+    """
+    Dataset class for Intraoprerative iUS segmentation. The structure of the folder is compatible with 
+    future direction of the project, i.e., using preopreative information for guiding segmentation. 
+    In line with this goal the dataset is structured in 'subjects' folders
+
+    Folder structure:
+        main_path
+        ├── dataset_name
+        |    ├── pre 
+        |    |    ├── subject_name
+        |    |    |    ├── img
+        |    |    |    |    ├── subject_name_img_001.png
+        |    |    |    |    ├── subject_name_img_002.png
+        |    |    |    ├── label
+        |    |    |    |    ├── subject_name_label_001.png
+        |    |    |    |    ├── subject_name_label_002.png
+        |    ├── post
+        |    |    ├── subject_name
+        |    |    |    ├── img
+        |    |    |    |    ├── subject_name_img_001.png
+        |    |    |    |    ├── subject_name_img_002.png
+        |    |    |    ├── label
+        |    |    |    |    ├── subject_name_label_001.png
+        |    |    |    |    ├── subject_name_label_002.png
+
+        joint_transform: augmentation transform, an instance of JointTransform2D. If bool(joint_transform)
+            evaluates to False, torchvision.transforms.ToTensor will be used on both image and mask.
+        one_hot_mask: bool, if True, returns the mask in one-hot encoded form.
+    """
+
+    def __init__(self,
+                main_path: str,
+                dataset_name: str, 
+                split: str, 
+                joint_transform: Callable = None, 
+                img_size = 256, 
+                prompt = "click", 
+                degree_prompt = 1,
+                class_id = 1,
+                one_hot_mask: int = False) -> None:
+
+        # dataset path
+        self.main_path = main_path
+        self.dataset_name = dataset_name
+        self.split = split
+    
+        self.one_hot_mask = one_hot_mask
         
+        self.data_list = self.get_data_list()
+
+        self.prompt = prompt
+        self.img_size = img_size
+        self.class_id = class_id
+        self.degree_prompt = degree_prompt    ## number of img/mask/text to use as prompt information
+        
+        if joint_transform is not None:
+            self.joint_transform = joint_transform
+        else:
+            to_tensor = T.ToTensor()
+            self.joint_transform = lambda x, y: (to_tensor(x), to_tensor(y))
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def __getitem__(self, idx):
+        
+        class_id0, image, mask, filename, img_prompt, mask_prompt, text_prompt = self.get_image_label(idx)
+
+        ## correct dimensions if needed & Data Augumentation
+        image, mask = correct_dims(image, mask)  
+        image, mask, low_mask = self.joint_transform(image, mask)
+
+        if self.one_hot_mask:
+            assert self.one_hot_mask > 0, 'one_hot_mask must be nonnegative'
+            mask = torch.zeros((self.one_hot_mask, mask.shape[1], mask.shape[2])).scatter_(0, mask.long(), 1)
+
+        # --------- make the point prompt -----------------
+        if self.prompt == 'click':
+            point_label = 1
+            if 'train' in self.split:
+                #class_id = randint(1, classes-1)
+                class_id = int(class_id0)
+            elif 'val' in self.split:
+                class_id = int(class_id0)
+            else:
+                class_id = self.class_id
+
+            if 'train' in self.split:
+                pt, point_label = random_click(np.asarray(mask), class_id)
+                bbox = random_bbox(np.asarray(mask), class_id, self.img_size)
+            else:
+                pt, point_label = fixed_click(np.asarray(mask), class_id)
+                bbox = fixed_bbox(np.asarray(mask), class_id, self.img_size)
+
+            mask[mask!=class_id] = 0
+            mask[mask==class_id] = 1
+            low_mask[low_mask!=class_id] = 0
+            low_mask[low_mask==class_id] = 1
+            point_labels = np.array(point_label)
+       
+        low_mask = low_mask.unsqueeze(0)
+        mask = mask.unsqueeze(0)
+
+        if img_prompt != None and mask_prompt != None and text_prompt != None:
+
+            ## Processinf prompt info
+            imgs_p, masks_p, low_masks_p = [], [], []
+            for img_p, mask_p in zip(img_prompt, mask_prompt):
+                img_p, mask_p = correct_dims(img_p, mask_p)
+                imag_p, mask_p, low_mask_p = self.joint_transform(img_p, mask_p)
+                
+                imgs_p.append(imag_p[0,:,:])
+                masks_p.append(mask_p)
+                low_masks_p.append(low_mask_p)
+
+            img_prompt = torch.stack(imgs_p, dim=0)
+            mask_prompt = torch.stack(masks_p, dim=0)
+
+        return {
+                'image': image,
+                'label': mask,
+                'p_label': point_labels,
+                'pt': pt,
+                'bbox': bbox,
+                'low_mask':low_mask,
+                'image_name': filename + '.png',
+                'class_id': class_id,
+                'img_prompt': img_prompt,
+                'mask_prompt': mask_prompt,
+                'text_prompt': text_prompt
+                }
+            
+    def get_image_label(self, idx):
+        """
+        Get image label and multimodal prompt
+        """
+        image_info = self.data_list[idx]
+        
+        ## Post iUS - input iUS and target mask
+        img_path = os.path.join(self.main_path, self.dataset_name, image_info[0], image_info[1].split('_')[0], 'img', image_info[1])
+        mask_path = os.path.join(self.main_path, self.dataset_name, image_info[0], image_info[1].split('_')[0], 'label', image_info[1])
+        image = cv2.imread(img_path, 0)
+        mask = cv2.imread(mask_path, 0)
+
+        if self.degree_prompt > 0: ## Pre iUS - prompt information
+            subject_prompt_dir = os.path.join(self.main_path, self.dataset_name, 'pre', image_info[1].split('_')[0])
+            img_prompt_path = os.path.join(subject_prompt_dir, 'img')
+            prompt_images_list = [f for f in os.listdir(img_prompt_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+
+            # Seleziona 3 immagini casuali (o tutte se <3)
+            num_samples = min(self.degree_prompt, len(prompt_images_list))
+            selected_prompts = random.sample(prompt_images_list, num_samples)
+
+            prompt_imgs, prompt_masks = [], []
+            for i in selected_prompts:
+                img_prompt = os.path.join(subject_prompt_dir, 'img', i)
+                print(img_prompt)
+                mask_prompt = os.path.join(subject_prompt_dir, 'label', i)
+                text_prompt = os.path.join(subject_prompt_dir, 'text', 'text_prompt.txt')
+                
+                img_prompt = cv2.imread(img_prompt, 0)
+                mask_prompt = cv2.imread(mask_prompt,0)
+
+                prompt_imgs.append(img_prompt)
+                prompt_masks.append(mask_prompt)
+
+            # Leggi il testo del prompt
+            text_prompt_path = os.path.join(subject_prompt_dir, 'text', 'text_prompt.txt')
+            if os.path.exists(text_prompt_path):
+                with open(text_prompt_path, 'r', encoding='utf-8') as f:
+                    text_prompt = f.read().strip()
+            else:
+                text_prompt = ""
+
+            return self.class_id, image, mask, image_info[1], prompt_imgs, prompt_masks, text_prompt
+        
+        else: # No preoperative information
+            return self.class_id, image, mask, image_info[1], None, None, None
+        
+
+    def get_data_list(self):
+        """
+        From patients name get the data list
+        subject_i -> post/subject_i
+        """
+        json_path = os.path.join(self.main_path, self.dataset_name, 'splitting.json')
+        with open(json_path, 'r') as f:
+            splitting_dict = json.load(f)
+      
+
+        subject_list = splitting_dict[self.split]
+        data_list = []
+        for subject in subject_list:
+            post_path = os.path.join(self.main_path, self.dataset_name, 'post', subject)
+            for img_name in os.listdir(os.path.join(post_path,'img')):
+                data_post = ['post', img_name]
+                data_list.append(data_post)
+
+        return data_list       
 
 if __name__ == '__main__':
     from preoperativeSAM.cfg import get_config
     import matplotlib.patches as patches
 
+    ## Single acquisition dataset
     opt = get_config("PreDura")
 
     low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
@@ -498,28 +698,84 @@ if __name__ == '__main__':
                                 prompt = "click",
                                 class_id = 1)
     
-    idx = np.random.randint(0,100)
-    for i in range(10):
+    # idx = np.random.randint(0,100)
+    # for i in range(10):
+    #     data = dataset[idx]
+         
+    #     ig, axes = plt.subplots(1, 3, figsize=(10, 5), num=i)
+    #     axes[0].imshow(data['image'][0], cmap='gray')
+    #     axes[0].set_title("Immagine")
+    #     # axes[0].axis('off')
+
+    #     axes[1].imshow(data['image'][0], cmap='gray')
+    #     axes[1].imshow(data['label'][0], alpha=0.2, cmap='jet')
+    #     ## click
+    #     x, y = data["pt"][0] 
+    #     axes[1].scatter(x, y, c='red', s=80, marker='x', label='Click') 
+    #     x_min, y_min, x_max, y_max = data["bbox"]
+    #     ## bbox
+    #     rect2 = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min,
+    #                           linewidth=2, edgecolor='red', facecolor='none', label='BBox')
+    #     axes[1].add_patch(rect2)
+    #     axes[1].set_title("Immagine + Maschera")
+    #     # axes[1].axis('off')
+
+    #     axes[2].imshow(data['low_mask'][0], cmap='gray')
+    #     axes[2].set_title("Immagine")
+    # plt.show()
+
+    ## Pre-Post dataset
+    opt = get_config("PrePostiUS")
+
+    low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
+    encoder_input_size = 256   ## the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS
+    degree_prompt = 3
+
+    dataset = PrePostiUS(main_path = opt.main_path, 
+                        dataset_name = opt.dataset_name, 
+                        split = opt.test_split, 
+                        joint_transform = transform, 
+                        img_size = opt.img_size,
+                        degree_prompt = degree_prompt,
+                        prompt = "click",
+                        class_id = 1)
+
+    idx = np.random.randint(0,2)
+    for i in range(5):
         data = dataset[idx]
          
-        ig, axes = plt.subplots(1, 3, figsize=(10, 5), num=i)
-        axes[0].imshow(data['image'][0], cmap='gray')
-        axes[0].set_title("Immagine")
+        fig, axes = plt.subplots(2, 3, figsize=(10, 5), num=data["image_name"] + ' ' + str(i))
+        axes[0,0].imshow(data['image'][0], cmap='gray')
+        axes[0,0].set_title("Immagine")
         # axes[0].axis('off')
 
-        axes[1].imshow(data['image'][0], cmap='gray')
-        axes[1].imshow(data['label'][0], alpha=0.2, cmap='jet')
+        axes[0,1].imshow(data['image'][0], cmap='gray')
+        axes[0,1].imshow(data['label'][0], alpha=0.2, cmap='jet')
         ## click
         x, y = data["pt"][0] 
-        axes[1].scatter(x, y, c='red', s=80, marker='x', label='Click') 
+        axes[0,1].scatter(x, y, c='red', s=80, marker='x', label='Click') 
         x_min, y_min, x_max, y_max = data["bbox"]
         ## bbox
         rect2 = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min,
                               linewidth=2, edgecolor='red', facecolor='none', label='BBox')
-        axes[1].add_patch(rect2)
-        axes[1].set_title("Immagine + Maschera")
+        axes[0,1].add_patch(rect2)
+        axes[0,1].set_title("Img + self prompt")
         # axes[1].axis('off')
 
-        axes[2].imshow(data['low_mask'][0], cmap='gray')
-        axes[2].set_title("Immagine")
+        axes[0,2].imshow(data['low_mask'][0], cmap='gray')
+        axes[0,2].set_title("Low Mask")
+
+        axes[1,0].imshow(data['img_prompt'][0], cmap='gray')
+        axes[1,0].imshow(data['mask_prompt'][0], alpha=0.2, cmap='jet')
+        axes[1,0].set_title(data["text_prompt"])
+
+        axes[1,1].imshow(data['img_prompt'][1], cmap='gray')
+        axes[1,1].imshow(data['mask_prompt'][1], alpha=0.2, cmap='jet')
+        axes[1,1].set_title(data["text_prompt"])
+
+        axes[1,2].imshow(data['img_prompt'][2], cmap='gray')
+        axes[1,2].imshow(data['mask_prompt'][2], alpha=0.2, cmap='jet')
+        axes[1,2].set_title(data["text_prompt"])
+
+
     plt.show()
