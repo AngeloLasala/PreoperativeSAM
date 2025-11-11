@@ -523,7 +523,7 @@ class PrePostiUS(Dataset):
     
         self.one_hot_mask = one_hot_mask
         
-        self.data_list = self.get_data_list()
+        self.data_list, self.subject_list = self.get_data_list()
 
         self.prompt = prompt
         self.img_size = img_size
@@ -664,8 +664,8 @@ class PrePostiUS(Dataset):
         with open(json_path, 'r') as f:
             splitting_dict = json.load(f)
       
-
         subject_list = splitting_dict[self.split]
+        
         data_list = []
         for subject in subject_list:
             post_path = os.path.join(self.main_path, self.dataset_name, 'post', subject)
@@ -673,7 +673,7 @@ class PrePostiUS(Dataset):
                 data_post = ['post', img_name]
                 data_list.append(data_post)
 
-        return data_list       
+        return data_list, subject_list  
 
 if __name__ == '__main__':
     from preoperativeSAM.cfg import get_config
@@ -729,18 +729,18 @@ if __name__ == '__main__':
 
     low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
     encoder_input_size = 256   ## the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS
-    degree_prompt = 0
+    degree_prompt = 3
 
     dataset = PrePostiUS(main_path = opt.main_path, 
                         dataset_name = opt.dataset_name, 
-                        split = opt.train_split, 
+                        split = opt.test_split, 
                         joint_transform = transform, 
                         img_size = opt.img_size,
                         degree_prompt = degree_prompt,
                         prompt = "click",
                         class_id = 1)
 
-    print(len(dataset))
+    print(f'N imgs: {len(dataset)}')
 
     idx = np.random.randint(0,2)
     for i in range(5):
