@@ -729,25 +729,27 @@ if __name__ == '__main__':
 
     low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
     encoder_input_size = 256   ## the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS
-    degree_prompt = 3
+    degree_prompt = 0
 
     dataset = PrePostiUS(main_path = opt.main_path, 
                         dataset_name = opt.dataset_name, 
-                        split = opt.test_split, 
+                        split = opt.train_split, 
                         joint_transform = transform, 
                         img_size = opt.img_size,
                         degree_prompt = degree_prompt,
                         prompt = "click",
                         class_id = 1)
 
+    print(len(dataset))
+
     idx = np.random.randint(0,2)
     for i in range(5):
         data = dataset[idx]
          
-        fig, axes = plt.subplots(2, 3, figsize=(10, 5), num=data["image_name"] + ' ' + str(i))
+        fig, axes = plt.subplots(2, 3, figsize=(20, 10), num=data["image_name"] + ' ' + str(i), tight_layout=True)
         axes[0,0].imshow(data['image'][0], cmap='gray')
-        axes[0,0].set_title("Immagine")
-        # axes[0].axis('off')
+        axes[0,0].set_title("Post resection - Input", fontsize=20)
+        axes[0,0].axis('off')
 
         axes[0,1].imshow(data['image'][0], cmap='gray')
         axes[0,1].imshow(data['label'][0], alpha=0.2, cmap='jet')
@@ -759,23 +761,28 @@ if __name__ == '__main__':
         rect2 = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min,
                               linewidth=2, edgecolor='red', facecolor='none', label='BBox')
         axes[0,1].add_patch(rect2)
-        axes[0,1].set_title("Img + self prompt")
-        # axes[1].axis('off')
+        axes[0,1].set_title("Input + self prompt", fontsize=20)
+        axes[0,1].axis('off')
+        
 
         axes[0,2].imshow(data['low_mask'][0], cmap='gray')
-        axes[0,2].set_title("Low Mask")
+        axes[0,2].set_title("Mask - Output", fontsize=20)
+        axes[0,2].axis('off')
 
-        axes[1,0].imshow(data['img_prompt'][0], cmap='gray')
-        axes[1,0].imshow(data['mask_prompt'][0], alpha=0.2, cmap='jet')
-        axes[1,0].set_title(data["text_prompt"])
+        if data['img_prompt'] != None and data['mask_prompt'] != None and data["text_prompt"] != None:
+            axes[1,0].imshow(data['img_prompt'][0], cmap='gray')
+            axes[1,0].imshow(data['mask_prompt'][0], alpha=0.2, cmap='jet')
+            axes[1,0].set_title(data["text_prompt"], fontsize=20)
+            axes[1,0].axis('off')
 
-        axes[1,1].imshow(data['img_prompt'][1], cmap='gray')
-        axes[1,1].imshow(data['mask_prompt'][1], alpha=0.2, cmap='jet')
-        axes[1,1].set_title(data["text_prompt"])
+            axes[1,1].imshow(data['img_prompt'][1], cmap='gray')
+            axes[1,1].imshow(data['mask_prompt'][1], alpha=0.2, cmap='jet')
+            axes[1,1].set_title(data["text_prompt"], fontsize=20)
+            axes[1,1].axis('off')
 
-        axes[1,2].imshow(data['img_prompt'][2], cmap='gray')
-        axes[1,2].imshow(data['mask_prompt'][2], alpha=0.2, cmap='jet')
-        axes[1,2].set_title(data["text_prompt"])
-
+            axes[1,2].imshow(data['img_prompt'][2], cmap='gray')
+            axes[1,2].imshow(data['mask_prompt'][2], alpha=0.2, cmap='jet')
+            axes[1,2].set_title(data["text_prompt"], fontsize=20)
+            axes[1,2].axis('off')
 
     plt.show()
