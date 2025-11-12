@@ -72,6 +72,7 @@ def main(args):
     ## get the model  ##############################################################
     logging.info(f" Creating model: {args.modelname} ...")
     model = get_model(modelname=args.modelname, args=args, opt=opt)
+    get_model_parameters(model)
     logging.info(' Done!\n')
 
     ## load the dataset  ##########################################################
@@ -105,7 +106,6 @@ def main(args):
     logging.info(f'  - warmup: {args.warmup}')
 
     model.to(device)
-    get_model_parameters(model)
     if opt.pre_trained:
         checkpoint = torch.load(opt.load_path)
         new_state_dict = {}
@@ -233,18 +233,35 @@ def main(args):
                 save_path = os.path.join(save_path, f'{args.modelname}_best')
                 torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
         if epoch == (opt.epochs-1):
+            ## save last model
             save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
             if not os.path.isdir(save_path):
                 os.makedirs(save_path)
             save_path = os.path.join(save_path, f'{args.modelname}_last')
             torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
-            # if args.keep_log:
-            #     with open(os.path.joiopt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/trainloss.txt', 'w') as f:
-            #         for i in range(len(loss_log)):
-            #             f.write(str(loss_log[i])+'\n')
-            #     with open(opt.tensorboard_path + args.modelname + opt.save_path_code + logtimestr + '/dice.txt', 'w') as f:
-            #         for i in range(len(dice_log)):
-            #             f.write(str(dice_log[i])+'\n')
+
+            ## save args
+            args_path = os.path.join(save_path + "_args.txt")
+            with open(args_path, "w") as f:
+                f.write("#### Training Arguments ####\n")
+                for k, v in vars(args).items():
+                    f.write(f"{k}: {v}\n")
+
+            ## save opt
+            opt_path = os.path.join(save_path + "_opt.txt")
+            with open(opt_path, "w") as f:
+                f.write("#### Configuration Options ####\n")
+                # se opt è un oggetto tipo Namespace o una classe con attributi
+                if hasattr(opt, '__dict__'):
+                    for k, v in vars(opt).items():
+                        f.write(f"{k}: {v}\n")
+                # se opt è un dizionario
+                elif isinstance(opt, dict):
+                    for k, v in opt.items():
+                        f.write(f"{k}: {v}\n")
+
+            logging.info(f"Saved last model and configuration to {save_path}")
+
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PreoperativeSAM model')
