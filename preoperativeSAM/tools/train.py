@@ -96,6 +96,8 @@ def main(args):
                                     img_size = args.encoder_input_size)  # return image, mask, and filename
     trainloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=8, pin_memory=True)
     valloader = DataLoader(val_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=8, pin_memory=True)
+    logging.info(f'  - train dataset: {len(train_dataset)}')
+    logging.info(f'  - val dataset: {len(val_dataset)}')
 
     ## Train initialization ########################################################################
     logging.info(' Train initialization...')
@@ -222,43 +224,42 @@ def main(args):
 
                 TensorWriter.add_figure('Image', fig, epoch)
 
-            if mean_dice > best_dice:
-                best_dice = mean_dice
-                timestr = time.strftime('%m%d%H%M')
+                if mean_dice > best_dice:
+                    best_dice = mean_dice
+                    save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
+                    if not os.path.isdir(save_path):
+                        os.makedirs(save_path)
+                    save_path = os.path.join(save_path, f'{args.modelname}_best')
+                    torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
+            if epoch == (opt.epochs-1):
+                ## save last model
                 save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
                 if not os.path.isdir(save_path):
                     os.makedirs(save_path)
-                save_path = os.path.join(save_path, f'{args.modelname}_best')
+                save_path = os.path.join(save_path, f'{args.modelname}_last')
                 torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
-        if epoch == (opt.epochs-1):
-            ## save last model
-            save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
-            if not os.path.isdir(save_path):
-                os.makedirs(save_path)
-            save_path = os.path.join(save_path, f'{args.modelname}_last')
-            torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
 
-            ## save args
-            args_path = os.path.join(save_path + "_args.txt")
-            with open(args_path, "w") as f:
-                f.write("#### Training Arguments ####\n")
-                for k, v in vars(args).items():
-                    f.write(f"{k}: {v}\n")
-
-            ## save opt
-            opt_path = os.path.join(save_path + "_opt.txt")
-            with open(opt_path, "w") as f:
-                f.write("#### Configuration Options ####\n")
-                # se opt è un oggetto tipo Namespace o una classe con attributi
-                if hasattr(opt, '__dict__'):
-                    for k, v in vars(opt).items():
-                        f.write(f"{k}: {v}\n")
-                # se opt è un dizionario
-                elif isinstance(opt, dict):
-                    for k, v in opt.items():
+                ## save args
+                args_path = os.path.join(save_path + "_args.txt")
+                with open(args_path, "w") as f:
+                    f.write("#### Training Arguments ####\n")
+                    for k, v in vars(args).items():
                         f.write(f"{k}: {v}\n")
 
-            logging.info(f"Saved last model and configuration to {save_path}")
+                ## save opt
+                opt_path = os.path.join(save_path + "_opt.txt")
+                with open(opt_path, "w") as f:
+                    f.write("#### Configuration Options ####\n")
+                    # se opt è un oggetto tipo Namespace o una classe con attributi
+                    if hasattr(opt, '__dict__'):
+                        for k, v in vars(opt).items():
+                            f.write(f"{k}: {v}\n")
+                    # se opt è un dizionario
+                    elif isinstance(opt, dict):
+                        for k, v in opt.items():
+                            f.write(f"{k}: {v}\n")
+
+                logging.info(f"Saved last model and configuration to {save_path}")
 
     
 if __name__ == '__main__':
