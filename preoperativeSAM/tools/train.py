@@ -28,7 +28,7 @@ from preoperativeSAM.utils.visualization import get_model_parameters
 from preoperativeSAM.utils.loss_functions.sam_loss import get_criterion
 from preoperativeSAM.utils.generate_prompts import get_click_prompt
 from preoperativeSAM.utils.evaluation import get_eval
-from preoperativeSAM.dataset.dataset import JointTransform2D, IntroperativeiUS
+from preoperativeSAM.dataset.dataset import JointTransform2D, IntroperativeiUS, PrePostiUS
 
 
 def main(args):
@@ -84,19 +84,18 @@ def main(args):
                                 p_contr=0.5, p_gama=0.5, p_distor=0.0, color_jitter_params=None, long_mask=True)  # image reprocessing
     tf_val = JointTransform2D(img_size=args.encoder_input_size, low_img_size=args.low_image_size, ori_size=opt.img_size, crop=opt.crop,
                              p_flip=0, color_jitter_params=None, long_mask=True)
-    train_dataset = IntroperativeiUS(main_path = opt.main_path, 
+    train_dataset = PrePostiUS(main_path = opt.main_path, 
                                     dataset_name = opt.dataset_name, 
                                     split = opt.train_split, 
                                     joint_transform = tf_train, 
                                     img_size = args.encoder_input_size)
-    val_dataset = IntroperativeiUS(main_path = opt.main_path, 
+    val_dataset = PrePostiUS(main_path = opt.main_path, 
                                     dataset_name = opt.dataset_name, 
                                     split = opt.val_split, 
                                     joint_transform = tf_val, 
                                     img_size = args.encoder_input_size)  # return image, mask, and filename
     trainloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=8, pin_memory=True)
     valloader = DataLoader(val_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=8, pin_memory=True)
-    logging.info(' Done!\n')
 
     ## Train initialization ########################################################################
     logging.info(' Train initialization...')
@@ -223,7 +222,6 @@ def main(args):
 
                 TensorWriter.add_figure('Image', fig, epoch)
 
-       
             if mean_dice > best_dice:
                 best_dice = mean_dice
                 timestr = time.strftime('%m%d%H%M')
