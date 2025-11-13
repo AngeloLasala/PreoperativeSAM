@@ -429,7 +429,7 @@ class IntroperativeiUS(Dataset):
             'pt': pt,
             'bbox': bbox,
             'low_mask':low_mask,
-            'image_name': filename + '.png',
+            'image_name': filename,
             'class_id': class_id,
             }
 
@@ -512,7 +512,7 @@ class PrePostiUS(Dataset):
                 joint_transform: Callable = None, 
                 img_size = 256, 
                 prompt = "click", 
-                degree_prompt = 1,
+                degree_prompt = 0,
                 class_id = 1,
                 one_hot_mask: int = False) -> None:
 
@@ -578,7 +578,7 @@ class PrePostiUS(Dataset):
         low_mask = low_mask.unsqueeze(0)
         mask = mask.unsqueeze(0)
 
-        if img_prompt != None and mask_prompt != None and text_prompt != None:
+        if img_prompt != 0 and mask_prompt != 0 and text_prompt != 0:
 
             ## Processinf prompt info
             imgs_p, masks_p, low_masks_p = [], [], []
@@ -600,7 +600,7 @@ class PrePostiUS(Dataset):
                 'pt': pt,
                 'bbox': bbox,
                 'low_mask':low_mask,
-                'image_name': filename + '.png',
+                'image_name': filename,
                 'class_id': class_id,
                 'img_prompt': img_prompt,
                 'mask_prompt': mask_prompt,
@@ -652,7 +652,7 @@ class PrePostiUS(Dataset):
             return self.class_id, image, mask, image_info[1], prompt_imgs, prompt_masks, text_prompt
         
         else: # No preoperative information
-            return self.class_id, image, mask, image_info[1], None, None, None
+            return self.class_id, image, mask, image_info[1], 0, 0, 0
         
 
     def get_data_list(self):
@@ -697,6 +697,8 @@ if __name__ == '__main__':
                                 img_size = opt.img_size,
                                 prompt = "click",
                                 class_id = 1)
+
+    print(len(dataset))
     
     # idx = np.random.randint(0,100)
     # for i in range(10):
@@ -769,7 +771,7 @@ if __name__ == '__main__':
         axes[0,2].set_title("Mask - Output", fontsize=20)
         axes[0,2].axis('off')
 
-        if data['img_prompt'] != None and data['mask_prompt'] != None and data["text_prompt"] != None:
+        if data['img_prompt'] != 0 and data['mask_prompt'] != 0 and data["text_prompt"] != 0:
             axes[1,0].imshow(data['img_prompt'][0], cmap='gray')
             axes[1,0].imshow(data['mask_prompt'][0], alpha=0.2, cmap='jet')
             axes[1,0].set_title(data["text_prompt"], fontsize=20)
