@@ -51,10 +51,13 @@ def main(args):
     ## set opt and device and logging folder ##################################################################
     opt = get_config(args.task)
     device = torch.device(opt.device)
+    logging.info(' Device')
+    logging.info(f' - {device}\n')
+
 
     if args.keep_log:
         logtimestr = time.strftime('%d-%m-%Y_%H-%M')  # initialize the tensorboard for record the training process
-        boardpath = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.tensorboard_folder, opt.dataset_name, logtimestr)
+        boardpath = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.tensorboard_folder, logtimestr)
         if not os.path.isdir(boardpath):
             os.makedirs(boardpath)
         TensorWriter = SummaryWriter(boardpath)
@@ -84,18 +87,26 @@ def main(args):
                                 p_contr=0.5, p_gama=0.5, p_distor=0.0, color_jitter_params=None, long_mask=True)  # image reprocessing
     tf_val = JointTransform2D(img_size=args.encoder_input_size, low_img_size=args.low_image_size, ori_size=opt.img_size, crop=opt.crop,
                              p_flip=0, color_jitter_params=None, long_mask=True)
-    train_dataset = PrePostiUS(main_path = opt.main_path, 
+
+    ## based on a args i want to select the datatset loader
+    dataset_cls = {
+        'pre_and_post': IntroperativeiUS,
+        'post': PrePostiUS,
+    }
+    dataset_class = dataset_cls[args.dataset_loader]
+    train_dataset = dataset_class(main_path = opt.main_path, 
                                     dataset_name = opt.dataset_name, 
                                     split = opt.train_split, 
                                     joint_transform = tf_train, 
                                     img_size = args.encoder_input_size)
-    val_dataset = PrePostiUS(main_path = opt.main_path, 
+    val_dataset = dataset_class(main_path = opt.main_path, 
                                     dataset_name = opt.dataset_name, 
                                     split = opt.val_split, 
                                     joint_transform = tf_val, 
                                     img_size = args.encoder_input_size)  # return image, mask, and filename
     trainloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=8, pin_memory=True)
     valloader = DataLoader(val_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=8, pin_memory=True)
+    logging.info(f'  - loader: {args.dataset_loader} - {dataset_class}')
     logging.info(f'  - train dataset: {len(train_dataset)}')
     logging.info(f'  - val dataset: {len(val_dataset)}')
 
@@ -226,14 +237,15 @@ def main(args):
 
                 if mean_dice > best_dice:
                     best_dice = mean_dice
-                    save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
+                    opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.tensorboard_folder, logtimestr
+                    save_path = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.save_folder, logtimestr)
                     if not os.path.isdir(save_path):
                         os.makedirs(save_path)
                     save_path = os.path.join(save_path, f'{args.modelname}_best')
                     torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
             if epoch == (opt.epochs-1):
                 ## save last model
-                save_path = os.path.join(opt.main_path, opt.result_folder, args.modelname, opt.save_folder, opt.dataset_name, logtimestr)
+                save_path = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.save_folder, logtimestr)
                 if not os.path.isdir(save_path):
                     os.makedirs(save_path)
                 save_path = os.path.join(save_path, f'{args.modelname}_last')
@@ -250,24 +262,19 @@ def main(args):
                 opt_path = os.path.join(save_path + "_opt.txt")
                 with open(opt_path, "w") as f:
                     f.write("#### Configuration Options ####\n")
-                    # se opt è un oggetto tipo Namespace o una classe con attributi
-                    if hasattr(opt, '__dict__'):
-                        for k, v in vars(opt).items():
-                            f.write(f"{k}: {v}\n")
-                    # se opt è un dizionario
-                    elif isinstance(opt, dict):
-                        for k, v in opt.items():
-                            f.write(f"{k}: {v}\n")
-
+                    for k, v in vars(opt).items():
+                        f.write(f"{k}: {v}\n")
+                    
                 logging.info(f"Saved last model and configuration to {save_path}")
 
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PreoperativeSAM model')
-    parser.add_argument('--modelname', default='SAM', type=str, help='type of model, e.g., SAM, ...')
+    parser.add_argument('--modelname', default='SAM', type=str, help='type of model, e.g., SAM, SAMUS')
+    parser.add_argument('--task', default='PreDura', help='task - set the opt configuration')
+    parser.add_argument('--dataset_loader', default='post', help='dataset - set dataset loader - pre_and_post = all imgs as as dataset; post = only intraopreative img as dataset')
     parser.add_argument('--encoder_input_size', type=int, default=256, help='the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS')
     parser.add_argument('--low_image_size', type=int, default=128, help='the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS')
-    parser.add_argument('--task', default='PreDura', help='task or dataset name')
     parser.add_argument('--batch_size', type=int, default=4, help='batch_size per gpu') # SAMed is 12 bs with 2n_gpu and lr is 0.005
     parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
     parser.add_argument('--base_lr', type=float, default=0.0005, help='segmentation network learning rate, 0.005 for SAMed, 0.0001 for MSA') #0.0006
