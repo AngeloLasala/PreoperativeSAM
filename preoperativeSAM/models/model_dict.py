@@ -49,9 +49,15 @@ if __name__ == "__main__":
     # }
     # ]
 
-    # # Esegui il forward pass
-    # outputs = model(dummy_input, multimask_output=True)
-    # print("Output keys:", outputs[0].keys())
+    dummy_input = torch.randn(1, 1, 256, 256)
+    t1 = torch.randn(1, 1, 2)
+    t2 = torch.randint(0, 2, (1, 1))
+    dummy_pt = (t1,t2)
+
+    # Esegui il forward pass
+    outputs = model(dummy_input, pt=dummy_pt)
+    print("Output masks:", outputs['masks'].shape)
+    print()
 
     print('SAMUS')
     class args_samus:
@@ -70,6 +76,9 @@ if __name__ == "__main__":
     print('image encoder')
     image_encoder = model.image_encoder
     get_model_parameters(image_encoder)
+     # Esegui il forward pass
+    outputs = model(dummy_input, pt=dummy_pt)
+    print("Output masks:", outputs['masks'].shape)
     print()
     
 
@@ -85,4 +94,7 @@ if __name__ == "__main__":
 
     model = get_model("AutoSAMUS", args=args_autosamus, opt=None)
     get_model_parameters(model)
+
+    outputs = model(dummy_input, pt=dummy_pt)
+    print("Output masks:", outputs['masks'].shape)
     
