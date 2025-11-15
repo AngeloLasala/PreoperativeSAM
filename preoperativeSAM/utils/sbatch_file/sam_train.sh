@@ -9,7 +9,7 @@
 #SBATCH --output=sam.out             # standard output file
 #SBATCH --account=IscrC_AIM-ORAL     # account name
 
-python -m --conf preoperativeSAM.tools.train\
+python -m  preoperativeSAM.tools.train\
           --task PrePostiUS\
           --model_name SAM\
           --dataset_loader pre_and_post\
