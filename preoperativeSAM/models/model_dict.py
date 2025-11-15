@@ -15,7 +15,7 @@ def get_model(modelname="SAM", args=None, opt=None):
         model = samus_model_registry['vit_b'](args=args, checkpoint = os.path.join(opt.main_path, opt.sam_ckpt))
     
     elif modelname == "AutoSAMUS":
-        model = autosamus_model_registry['vit_b'](args=args, checkpoint = None) # checkpoint=opt.load_path)
+        model = autosamus_model_registry['vit_b'](args=args, checkpoint = os.path.join(opt.main_path, opt.load_path)) # checkpoint=opt.load_path)
     else:
         raise RuntimeError("Could not find the model:", modelname)
     return model
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO)
 
-    print('SAM')
+    print('======== SAM ========')
     class args_sam:
         main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
         dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     print("Output masks:", outputs['masks'].shape)
     print()
 
-    print('SAMUS')
+    print('======== SAMUS ========')
     class args_samus:
         main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
         dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     print()
     
 
-    print('AutoSAMUS')
+    print('======== AutoSAMUS ========')
     class args_autosamus:
         main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
         dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
@@ -94,6 +94,14 @@ if __name__ == "__main__":
 
     model = get_model("AutoSAMUS", args=args_autosamus, opt=None)
     get_model_parameters(model)
+    print('image encoder')
+    image_encoder = model.image_encoder
+    get_model_parameters(image_encoder)
+    print()
+    print('prompt generator')
+    prompt_encoder = model.prompt_generator
+    get_model_parameters(prompt_encoder)
+
 
     outputs = model(dummy_input, pt=dummy_pt)
     print("Output masks:", outputs['masks'].shape)

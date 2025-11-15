@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import torch
-
+import logging
 from functools import partial
 
 from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Samus, TwoWayTransformer, Prompt_Embedding_Generator
@@ -104,6 +104,7 @@ def _build_samus(
     )
     samus.eval()
     if checkpoint is not None:
+        logging.info(f' pretrained SAMUS at path {checkpoint}')
         with open(checkpoint, "rb") as f:
             state_dict = torch.load(f)
         try:
