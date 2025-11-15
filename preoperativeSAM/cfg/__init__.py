@@ -1,9 +1,12 @@
 """
 Configuration class
+
+local main_path:    "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
+cluster main_path:  "/leonardo_work/IscrC_AIM-ORAL/Angelo/AIRCARE"
 """
 class PreDura:
     ## Paths    ##########################################################################
-    main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
+    main_path = "/leonardo_work/IscrC_AIM-ORAL/Angelo/AIRCARE"
     dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
     save_folder = "checkpoints"
     result_folder = "results"
@@ -12,7 +15,7 @@ class PreDura:
 
     ## Training parameters    ##########################################################
     workers = 1                         # number of data loading workers (default: 8)
-    epochs = 5                        # number of total epochs to run (default: 400)
+    epochs = 200                        # number of total epochs to run (default: 400)
     batch_size = 8                      # batch size (default: 4)
     learning_rate = 5e-4                # iniial learning rate (default: 0.001)
     momentum = 0.9                      # momntum
@@ -37,7 +40,7 @@ class PreDura:
 
 class PrePost:
     ## Paths    ##########################################################################
-    main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
+    main_path = "/leonardo_work/IscrC_AIM-ORAL/Angelo/AIRCARE"
     dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
     save_folder = "checkpoints"
     result_folder = "results"
@@ -46,7 +49,7 @@ class PrePost:
 
     ## Training parameters    ##########################################################
     workers = 1                         # number of data loading workers (default: 8)
-    epochs = 2                          # number of total epochs to run (default: 400)
+    epochs = 200                        # number of total epochs to run (default: 400)
     batch_size = 8                      # batch size (default: 4)
     learning_rate = 5e-4                # iniial learning rate (default: 0.001)
     momentum = 0.9                      # momntum
