@@ -11,6 +11,6 @@
 
 python -m  preoperativeSAM.tools.train\
           --task PrePostiUS\
-          --model_name SAM\
+          --modelname SAM\
           --dataset_loader pre_and_post\
           --keep_log
