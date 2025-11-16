@@ -57,6 +57,7 @@ if __name__ == "__main__":
     # Esegui il forward pass
     outputs = model(dummy_input, pt=dummy_pt)
     print("Output masks:", outputs['masks'].shape)
+    print(outputs.keys())
     print()
 
     print('======== SAMUS ========')
@@ -78,6 +79,7 @@ if __name__ == "__main__":
     get_model_parameters(image_encoder)
      # Esegui il forward pass
     outputs = model(dummy_input, pt=dummy_pt)
+    print(outputs.keys())
     print("Output masks:", outputs['masks'].shape)
     print()
     
@@ -92,7 +94,7 @@ if __name__ == "__main__":
         sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
         encoder_input_size = 256
 
-    model = get_model("AutoSAMUS", args=args_autosamus, opt=None)
+    model = get_model("AutoSAMUS", args=args_autosamus, opt=args_autosamus)
     get_model_parameters(model)
     print('image encoder')
     image_encoder = model.image_encoder
@@ -104,5 +106,6 @@ if __name__ == "__main__":
 
 
     outputs = model(dummy_input, pt=dummy_pt)
+    print(outputs.keys())
     print("Output masks:", outputs['masks'].shape)
     

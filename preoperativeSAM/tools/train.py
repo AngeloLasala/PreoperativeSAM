@@ -57,6 +57,7 @@ def main(args):
 
     if args.keep_log:
         logtimestr = time.strftime('%d-%m-%Y_%H-%M')  # initialize the tensorboard for record the training process
+        logging.info(f' Day: {logtimestr}\n')
         boardpath = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.tensorboard_folder, f'{args.dataset_loader}_{logtimestr}')
         if not os.path.isdir(boardpath):
             os.makedirs(boardpath)
