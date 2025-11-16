@@ -46,7 +46,7 @@ class PrePost:
     result_folder = "results"
     tensorboard_folder = "tensorboard"
     sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
-    load_path = "results/Dataset_iUS/SAMUS/checkpoints/post_15-11-2025_11-56/SAMUS_best.pth"
+    load_path = "results/Dataset_iUS/SAMUS/checkpoints/pre_and_post_15-11-2025_11-30/SAMUS_best.pth"
 
     ## Training parameters    ##########################################################
     workers = 1                         # number of data loading workers (default: 8)

@@ -771,7 +771,7 @@ if __name__ == '__main__':
         axes[0,2].set_title("Mask - Output", fontsize=20)
         axes[0,2].axis('off')
 
-        if data['img_prompt'] != 0 and data['mask_prompt'] != 0 and data["text_prompt"] != 0:
+        if (data['img_prompt'] != 0) and (data['mask_prompt'] != 0) and (data["text_prompt"] != 0):
             axes[1,0].imshow(data['img_prompt'][0], cmap='gray')
             axes[1,0].imshow(data['mask_prompt'][0], alpha=0.2, cmap='jet')
             axes[1,0].set_title(data["text_prompt"], fontsize=20)
