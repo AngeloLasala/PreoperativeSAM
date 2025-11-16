@@ -33,7 +33,6 @@ if __name__ == "__main__":
         result_folder = "results"
         tensorboard_folder = "tensorboard"
         sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
-
     model = get_model("SAM", args=None, opt=args_sam)
     get_model_parameters(model)
     print()
@@ -56,7 +55,7 @@ if __name__ == "__main__":
 
     # Esegui il forward pass
     outputs = model(dummy_input, pt=dummy_pt)
-    print("Output masks:", outputs['masks'].shape)
+    print("Output masks:", outputs['low_res_logits'].shape)
     print(outputs.keys())
     print()
 
@@ -80,7 +79,7 @@ if __name__ == "__main__":
      # Esegui il forward pass
     outputs = model(dummy_input, pt=dummy_pt)
     print(outputs.keys())
-    print("Output masks:", outputs['masks'].shape)
+    print("Output masks:", outputs['low_res_logits'].shape)
     print()
     
 

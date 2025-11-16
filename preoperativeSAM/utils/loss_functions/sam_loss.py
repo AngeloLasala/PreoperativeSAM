@@ -159,7 +159,7 @@ class Mask_DC_and_BCE_loss(nn.Module):
         self.dice_weight = dice_weight
 
     def forward(self, net_output, target):
-        low_res_logits = net_output['low_res_logits']
+        low_res_logits = net_output['masks']
         if len(target.shape) == 5:
             target = target.view(-1, target.shape[2], target.shape[3], target.shape[4])
             low_res_logits = low_res_logits.view(-1, low_res_logits.shape[2], low_res_logits.shape[3], low_res_logits.shape[4])

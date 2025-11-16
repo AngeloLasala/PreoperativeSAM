@@ -157,11 +157,14 @@ def main(args):
         train_losses = 0
         for batch_idx, (datapack) in enumerate(trainloader):
             imgs = datapack['image'].to(dtype = torch.float32, device=opt.device)
-            masks = datapack['low_mask'].to(dtype = torch.float32, device=opt.device)
+            # masks = datapack['low_mask'].to(dtype = torch.float32, device=opt.device) # original code
+            masks = datapack['label'].to(dtype = torch.float32, device=opt.device)
             bbox = torch.as_tensor(datapack['bbox'], dtype=torch.float32, device=opt.device)
             pt = get_click_prompt(datapack, opt)
 
             ## forward
+            ## Note: masks is the low res mask 128*128, i don't like it 
+            ## update ina way to compute loss in full resolution
             pred = model(imgs, pt, bbox)
             train_loss = criterion(pred, masks)
             
