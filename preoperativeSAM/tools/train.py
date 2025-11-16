@@ -166,7 +166,6 @@ def main(args):
             ## Note: masks is the low res mask 128*128, i don't like it 
             ## update in a way to compute loss in full resolution
             pred = model(imgs, pt, bbox)
-            print(pred['masks'].shape, masks.shape)
             train_loss = criterion(pred, masks)
             
             ## backward

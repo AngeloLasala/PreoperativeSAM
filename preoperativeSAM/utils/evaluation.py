@@ -110,7 +110,6 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
     sum_time = 0
     for batch_idx, (datapack) in enumerate(valloader):
         imgs = Variable(datapack['image'].to(dtype = torch.float32, device=opt.device))
-        masks = Variable(datapack['low_mask'].to(dtype = torch.float32, device=opt.device))
         label = Variable(datapack['label'].to(dtype = torch.float32, device=opt.device))
         class_id = datapack['class_id']
         image_filename = datapack['image_name']
@@ -122,7 +121,7 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
             pred = model(imgs, pt)
             sum_time =  sum_time + (time.time()-start_time)
 
-        val_loss = criterion(pred, masks)
+        val_loss = criterion(pred, label)
         val_losses += val_loss.item()
 
         if args.modelname == 'MSA' or args.modelname == 'SAM':
