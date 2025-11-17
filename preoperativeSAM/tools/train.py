@@ -241,15 +241,14 @@ def main(args):
 
                 if mean_dice > best_dice:
                     best_dice = mean_dice
-                    opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.tensorboard_folder, logtimestr
-                    save_path = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.save_folder, logtimestr)
+                    save_path = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.save_folder, f'{args.dataset_loader}_{logtimestr}')
                     if not os.path.isdir(save_path):
                         os.makedirs(save_path)
                     save_path = os.path.join(save_path, f'{args.modelname}_best')
                     torch.save(model.state_dict(), save_path + ".pth", _use_new_zipfile_serialization=False)
             if epoch == (opt.epochs-1):
                 ## save last model
-                save_path = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.save_folder, logtimestr)
+                save_path = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, args.modelname, opt.save_folder, f'{args.dataset_loader}_{logtimestr}')
                 if not os.path.isdir(save_path):
                     os.makedirs(save_path)
                 save_path = os.path.join(save_path, f'{args.modelname}_last')
