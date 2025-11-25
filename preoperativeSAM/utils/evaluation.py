@@ -118,7 +118,10 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
 
         with torch.no_grad():
             start_time = time.time()
-            pred = model(imgs, pt)
+            if args.modelname == 'PRESAMUS':
+                pre_imgs = Variable(datapack['img_prompt'].to(dtype = torch.float32, device=opt.device))
+                pred = model(imgs, pt, intra_imgs=imgs, pre_imgs=pre_imgs) 
+            else: pred = model(imgs, pt)
             sum_time =  sum_time + (time.time()-start_time)
 
         val_loss = criterion(pred, label)

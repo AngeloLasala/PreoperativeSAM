@@ -99,12 +99,14 @@ def main(args):
                                     dataset_name = opt.dataset_name, 
                                     split = opt.train_split, 
                                     joint_transform = tf_train, 
-                                    img_size = args.encoder_input_size)
+                                    img_size = args.encoder_input_size,
+                                    degree_prompt = 1)
     val_dataset = dataset_class(main_path = opt.main_path, 
                                     dataset_name = opt.dataset_name, 
                                     split = opt.val_split, 
                                     joint_transform = tf_val, 
-                                    img_size = args.encoder_input_size)  # return image, mask, and filename
+                                    img_size = args.encoder_input_size,
+                                    degree_prompt = 1)  # return image, mask, and filename
     trainloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=8, pin_memory=True)
     valloader = DataLoader(val_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=8, pin_memory=True)
     logging.info(f'  - loader: {args.dataset_loader} - {dataset_class}')
@@ -161,13 +163,15 @@ def main(args):
             masks = datapack['label'].to(dtype = torch.float32, device=opt.device)
             bbox = torch.as_tensor(datapack['bbox'], dtype=torch.float32, device=opt.device)
             pt = get_click_prompt(datapack, opt)
-
-            ## forward
-            ## Note: masks is the low res mask 128*128, i don't like it 
-            ## update in a way to compute loss in full resolution
-            pred = model(imgs, pt, bbox)
-            train_loss = criterion(pred, masks)
             
+            ## forward
+            if args.modelname == 'PRESAMUS':
+                pre_imgs = datapack['img_prompt'].to(dtype = torch.float32, device=opt.device)
+                pred = model(imgs, pt, intra_imgs=imgs, pre_imgs=pre_imgs)
+            else:
+                pred = model(imgs, pt, bbox)
+            train_loss = criterion(pred, masks)
+         
             ## backward
             optimizer.zero_grad()
             train_loss.backward()
@@ -219,7 +223,10 @@ def main(args):
                 pt = get_click_prompt(datapack, opt)
 
                 with torch.no_grad():
-                    pred = model(imgs, pt)
+                    if args.modelname == 'PRESAMUS':
+                        pre_imgs = datapack['img_prompt'].unsqueeze(0).to(dtype = torch.float32, device=opt.device)
+                        pred = model(imgs, pt, intra_imgs=imgs, pre_imgs=pre_imgs)
+                    else: pred = model(imgs, pt)
 
                 predict = torch.sigmoid(pred['masks'])
                 pred = predict.detach().cpu().numpy()[0, 0, :, :]  # (b, c, h, w)

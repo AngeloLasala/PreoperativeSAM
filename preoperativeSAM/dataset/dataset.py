@@ -631,7 +631,6 @@ class PrePostiUS(Dataset):
             prompt_imgs, prompt_masks = [], []
             for i in selected_prompts:
                 img_prompt = os.path.join(subject_prompt_dir, 'img', i)
-                print(img_prompt)
                 mask_prompt = os.path.join(subject_prompt_dir, 'label', i)
                 text_prompt = os.path.join(subject_prompt_dir, 'text', 'text_prompt.txt')
                 
