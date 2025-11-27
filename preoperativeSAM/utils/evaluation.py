@@ -13,7 +13,7 @@ import logging
 
 from preoperativeSAM.utils.generate_prompts import get_click_prompt
 import preoperativeSAM.utils.metrics as metrics
-from preoperativeSAM.utils.visualization import visual_segmentation, visual_segmentation_binary, visual_segmentation_sets, visual_segmentation_sets_with_pt
+from preoperativeSAM.utils.visualization import visual_segmentation, visual_segmentation_binary, visual_segmentation_sets, visual_segmentation_sets_with_pt, visual_prediction_segmentation
 
 
 
@@ -108,6 +108,12 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
     
     eval_number = 0
     sum_time = 0
+
+    ## create save folder
+    save_dir = os.path.join(os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, opt.modelname, 
+                                          opt.save_folder, args.checkpoint, 'prediction'))
+    os.makedirs(save_dir, exist_ok=True)
+
     for batch_idx, (datapack) in enumerate(valloader):
         imgs = Variable(datapack['image'].to(dtype = torch.float32, device=opt.device))
         label = Variable(datapack['label'].to(dtype = torch.float32, device=opt.device))
@@ -152,7 +158,10 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
             hds[eval_number+j, 1] += hausdorff_distance(pred_i[0, :, :], gt_i[0, :, :], distance="manhattan")
             del pred_i, gt_i
             if opt.visual:
-                visual_segmentation_sets_with_pt(seg[j:j+1, :, :], image_filename[j], opt, pt[0][j, :, :])
+                imgs_v = imgs.detach().cpu().numpy()
+                imgs_name = datapack['image_name']
+                visual_prediction_segmentation(imgs_v[:,0,:,:], imgs_name, gt, seg, save_dir)
+                # visual_segmentation_sets_with_pt(seg[j:j+1, :, :], image_filename[j], opt, pt[0][j, :, :])
         eval_number = eval_number + b
     dices = dices[:eval_number, :] 
     hds = hds[:eval_number, :] 

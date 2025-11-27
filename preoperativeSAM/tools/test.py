@@ -34,7 +34,7 @@ def main(args):
     ## set opt and device and logging folder ##################################################################
     opt = get_config(args.task)
     opt.mode = "val"
-    opt.visual = False
+    opt.visual = True
     opt.modelname = args.modelname
     device = torch.device(opt.device)
     logging.info(' Options information')

@@ -26,6 +26,68 @@ def get_model_parameters(model):
     logging.info(f"   - trainable: {trainable_params/1e6:.2f}M")
     logging.info(f"   - untrainable: {frozen_params/1e6:.2f}M")
 
+def visual_prediction_segmentation(imgs, imgs_name, gt, seg, save_dir):
+    """
+    Visual real image, predicted mask and label mask of given trained model
+
+    Parameters
+    ----------
+    imgs: batch of img
+    imgs_name: batch of images name
+    label: batch of label
+    pred: batch of prediction
+    """
+
+    # Colori BGR
+    color_gt   = [0, 255, 0]   # Verde = corretto
+    color_pred = [255, 0, 0]   # Blu   = extra pred
+    color_err  = [0, 0, 255]   # Rosso = errore (mancata pred)
+
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
+
+    B = imgs.shape[0]
+
+    # Converti da (B,3,H,W) a (B,H,W,3) se necessario
+    if imgs.shape[1] == 3:
+        imgs = np.transpose(imgs, (0, 2, 3, 1))
+
+
+    for i in range(B):
+        img = imgs[i].copy()
+        img_name = imgs_name[i]
+        gt_mask = gt[i]
+        seg_mask = seg[i]
+
+       # Converte in 8bit
+        if img.max() <= 1.0:
+            img = (img * 255).astype(np.uint8)
+        else:
+            img = img.astype(np.uint8)
+
+        # Converti da 1 canale → 3 canali
+        img_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+        overlay = img_color.copy()
+
+        
+        # Mask logiche
+        match = (gt_mask == 1) & (seg_mask == 1)
+        wrong = (gt_mask == 1) & (seg_mask != 1)
+        extra = (gt_mask != 1) & (seg_mask == 1)
+
+        overlay[match] = color_gt
+        overlay[wrong] = color_err
+        overlay[extra] = color_pred
+
+        final = cv2.addWeighted(img_color, 0.6, overlay, 0.4, 0)
+
+        save_img = os.path.join(save_dir, f'{img_name}.png')
+        cv2.imwrite(save_img, final)
+
+
+
+
 def visual_segmentation(seg, image_filename, opt):
     img_ori = cv2.imread(os.path.join(opt.data_path + '/img', image_filename))
     img_ori0 = cv2.imread(os.path.join(opt.data_path + '/img', image_filename))
