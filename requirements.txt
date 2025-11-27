@@ -12,3 +12,4 @@ setuptools
 scikit-image
 tensorboard
 tqdm
+thop

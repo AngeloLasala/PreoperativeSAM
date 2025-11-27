@@ -40,12 +40,15 @@ class PreDura:
 
 class PrePost:
     ## Paths    ##########################################################################
-    main_path = "/leonardo_work/IscrC_AIM-ORAL/Angelo/AIRCARE"
+    main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
     dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
     save_folder = "checkpoints"
     result_folder = "results"
     tensorboard_folder = "tensorboard"
     sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
+    ## load_path info
+    ## train - load the pretrained version of SAMUS for Autosamus
+    ## test - load the trained weight of selected model. Io lo voglio inserire come parser in test.py
     load_path = "results/Dataset_iUS/SAMUS/checkpoints/post_25-11-2025_09-40/SAMUS_best.pth"
 
     ## Training parameters    ##########################################################
