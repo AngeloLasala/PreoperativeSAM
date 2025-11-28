@@ -4,6 +4,7 @@ Ausiliar file to load different models
 from preoperativeSAM.models.segment_anything.build_sam import sam_model_registry
 from preoperativeSAM.models.segment_anything_samus.build_sam_us import samus_model_registry
 from preoperativeSAM.models.preoperative_samus.build_presamus import presamus_model_registry
+from preoperativeSAM.models.preoperative_sam.build_presam import presam_model_registry
 from preoperativeSAM.models.segment_anything_samus_autoprompt.build_samus import autosamus_model_registry
 from preoperativeSAM.utils.visualization import get_model_parameters
 import os
@@ -17,6 +18,9 @@ def get_model(modelname="SAM", args=None, opt=None):
     
     elif modelname == "PRESAMUS":
         model = presamus_model_registry['vit_b'](args=args, checkpoint = os.path.join(opt.main_path, opt.sam_ckpt))
+    
+    elif modelname == "PRESAM":
+        model = presam_model_registry['vit_b'](args=args, checkpoint = os.path.join(opt.main_path, opt.sam_ckpt))
     
     elif modelname == "AutoSAMUS":
         model = autosamus_model_registry['vit_b'](args=args, checkpoint = os.path.join(opt.main_path, opt.load_path)) # checkpoint=opt.load_path)
@@ -62,6 +66,37 @@ if __name__ == "__main__":
     print("Output masks:", outputs['low_res_logits'].shape)
     print(outputs.keys())
     print()
+
+    print('======== PRESAM ========')
+    class args_sam:
+        main_path = "/media/angelo/OS/Users/lasal/OneDrive - Scuola Superiore Sant'Anna/Assistant_Researcher/AIRCARE"
+        dataset_name = "Dataset_iUS"       # note here i have two folder, pre and post
+        save_folder = "checkpoints"
+        result_folder = "results"
+        tensorboard_folder = "tensorboard"
+        sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
+        encoder_input_size = 256
+
+    model = get_model("PRESAM", args=args_sam, opt=args_sam)
+    print('Full model')
+    get_model_parameters(model)
+    print()
+    print('image encoder')
+    image_encoder = model.image_encoder
+    get_model_parameters(image_encoder)
+    print()
+    print('prompt encoder')
+    prompt_encoder = model.prompt_encoder
+    get_model_parameters(prompt_encoder)
+
+     # Esegui il forward pass
+    outputs = model(dummy_input, pt=dummy_pt, pre_imgs=dummy_input, intra_imgs=dummy_input)
+    print(outputs.keys())
+    print("Output masks:", outputs['low_res_logits'].shape)
+    print()
+    exit()
+
+
 
     print('======== SAMUS ========')
     class args_samus:
