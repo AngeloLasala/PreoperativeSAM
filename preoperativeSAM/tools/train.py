@@ -165,7 +165,7 @@ def main(args):
             pt = get_click_prompt(datapack, opt)
             
             ## forward
-            if args.modelname == 'PRESAMUS':
+            if args.modelname == 'PRESAMUS' or args.modelname == 'PRESAM':
                 pre_imgs = datapack['img_prompt'].to(dtype = torch.float32, device=opt.device)
                 pred = model(imgs, pt, intra_imgs=imgs, pre_imgs=pre_imgs)
             else:
@@ -223,7 +223,7 @@ def main(args):
                 pt = get_click_prompt(datapack, opt)
 
                 with torch.no_grad():
-                    if args.modelname == 'PRESAMUS':
+                    if args.modelname == 'PRESAMUS' or args.modelname == 'PRESAM':
                         pre_imgs = datapack['img_prompt'].unsqueeze(0).to(dtype = torch.float32, device=opt.device)
                         pred = model(imgs, pt, intra_imgs=imgs, pre_imgs=pre_imgs)
                     else: pred = model(imgs, pt)

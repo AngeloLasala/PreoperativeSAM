@@ -110,9 +110,10 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
     sum_time = 0
 
     ## create save folder
-    save_dir = os.path.join(os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, opt.modelname, 
-                                          opt.save_folder, args.checkpoint, 'prediction'))
-    os.makedirs(save_dir, exist_ok=True)
+    if opt.mode != 'train':
+        save_dir = os.path.join(os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, opt.modelname, 
+                                            opt.save_folder, args.checkpoint, 'prediction'))
+        os.makedirs(save_dir, exist_ok=True)
 
     for batch_idx, (datapack) in enumerate(valloader):
         imgs = Variable(datapack['image'].to(dtype = torch.float32, device=opt.device))
@@ -124,7 +125,7 @@ def eval_mask_slice2(valloader, model, criterion, opt, args):
 
         with torch.no_grad():
             start_time = time.time()
-            if args.modelname == 'PRESAMUS':
+            if args.modelname == 'PRESAMUS' or args.modelname == 'PRESAM':
                 pre_imgs = Variable(datapack['img_prompt'].to(dtype = torch.float32, device=opt.device))
                 pred = model(imgs, pt, intra_imgs=imgs, pre_imgs=pre_imgs) 
             else: pred = model(imgs, pt)
