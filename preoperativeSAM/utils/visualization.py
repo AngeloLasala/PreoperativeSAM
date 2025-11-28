@@ -80,7 +80,7 @@ def visual_prediction_segmentation(imgs, imgs_name, gt, seg, save_dir):
         overlay[wrong] = color_err
         overlay[extra] = color_pred
 
-        final = cv2.addWeighted(img_color, 0.6, overlay, 0.4, 0)
+        final = cv2.addWeighted(img_color, 0.9, overlay, 0.3, 0)
 
         save_img = os.path.join(save_dir, f'{img_name}.png')
         cv2.imwrite(save_img, final)
