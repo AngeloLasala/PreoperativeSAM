@@ -42,8 +42,20 @@ if __name__ == "__main__":
         tensorboard_folder = "tensorboard"
         sam_ckpt = "pretreined_SAM/sam_vit_b_01ec64.pth"
     model = get_model("SAM", args=None, opt=args_sam)
+    print('Full model')
     get_model_parameters(model)
     print()
+    print('image encoder')
+    image_encoder = model.image_encoder
+    get_model_parameters(image_encoder)
+    print()
+    print('prompt encoder')
+    prompt_encoder = model.prompt_encoder
+    get_model_parameters(prompt_encoder)
+    print()
+    print('mask decoder')
+    mask_decoder = model.mask_decoder
+    get_model_parameters(mask_decoder)
 
     # dummy_input = [
     # {
@@ -88,6 +100,10 @@ if __name__ == "__main__":
     print('prompt encoder')
     prompt_encoder = model.prompt_encoder
     get_model_parameters(prompt_encoder)
+    print()
+    print('mask decoder')
+    mask_decoder = model.mask_decoder
+    get_model_parameters(mask_decoder)
 
      # Esegui il forward pass
     outputs = model(dummy_input, pt=dummy_pt, pre_imgs=dummy_input, intra_imgs=dummy_input)

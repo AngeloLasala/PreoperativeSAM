@@ -128,7 +128,7 @@ def main(args):
         # Salvataggio su file
         text_results = os.path.join(opt.main_path, opt.result_folder, opt.dataset_name, opt.modelname, 
                             opt.save_folder, args.checkpoint, "test_result.txt")
-        with open(text_results, "a+") as file:
+        with open(text_results, "w") as file:
             file.write(f"{args.task} {args.modelname} \n")
             for name, (mean_vals, std_vals) in metrics.items():
                 line = f"{name}: "
