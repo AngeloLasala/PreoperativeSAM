@@ -78,7 +78,7 @@ def read_json_annotation(ann_path):
 
         # get segmentation:
         if len(segmentation) > 0:
-            print(f"   - category_id: {category_id}, three_class_id: {three_class_id}, number of segmentation points: {len(segmentation)}")
+            # print(f"   - category_id: {category_id}, three_class_id: {three_class_id}, number of segmentation points: {len(segmentation)}")
             coords = segmentation[0]
             points = [(coords[i], coords[i+1]) for i in range(0, len(coords), 2)]
         else:
@@ -99,7 +99,7 @@ def read_xml_annotation(ann_path):
     for obj in root.findall('object'):
         category_id = obj.find(".//classification_id").text
         three_class_id = obj.find(".//three_class_classification").text
-        print(f"   - category_id: {category_id}, three_class_id: {three_class_id}")
+        # print(f"   - category_id: {category_id}, three_class_id: {three_class_id}")
         pts = obj.findall(".//pt")
         if pts:
             polygon = [(int(pt.find("x").text), int(pt.find("y").text)) for pt in pts]
@@ -152,20 +152,19 @@ def processing_dataset(dataset_info, args):
         # create sub folder in pre and intra
         sub_pre_dir = os.path.join(pre_dir, str(sub_idx))
         sub_intra_dir = os.path.join(intra_dir, str(sub_idx))
-        if not os.path.exists(sub_pre_dir):
-            os.makedirs(sub_pre_dir)
-            img_pre_dir = os.path.join(sub_pre_dir, 'img')
-            label_pre_dir = os.path.join(sub_pre_dir, 'label')
-            os.makedirs(img_pre_dir)
-            os.makedirs(label_pre_dir)
-        if not os.path.exists(sub_intra_dir):
-            os.makedirs(sub_intra_dir)
-            img_intra_dir = os.path.join(sub_intra_dir, 'img')
-            label_intra_dir = os.path.join(sub_intra_dir, 'label')
-            os.makedirs(img_intra_dir)
-            os.makedirs(label_intra_dir)
-
+        os.makedirs(sub_pre_dir, exist_ok=True)
+        os.makedirs(sub_intra_dir, exist_ok=True)
+            
+        img_pre_dir = os.path.join(sub_pre_dir, 'img')
+        label_pre_dir = os.path.join(sub_pre_dir, 'label')
+        os.makedirs(img_pre_dir, exist_ok=True)
+        os.makedirs(label_pre_dir, exist_ok=True)
         
+        img_intra_dir = os.path.join(sub_intra_dir, 'img')
+        label_intra_dir = os.path.join(sub_intra_dir, 'label')
+        os.makedirs(img_intra_dir, exist_ok=True)
+        os.makedirs(label_intra_dir, exist_ok=True)
+
         ## process pre imags
         for img_name in sub_pre:
             img_path = os.path.join(args.dataset, str(sub_idx), sub_dict[sub_idx]['folder'], f'{img_name}.jpg')
@@ -234,11 +233,123 @@ def processing_dataset(dataset_info, args):
             # plt.imshow(img)
             # plt.imshow(mask, cmap='jet', alpha=0.4)
             # plt.show()
-        exit()
+        
 
     ## process only intra dataset
     dataset_only_intra = dataset_info['only_intra']
+    for sub_dict in dataset_only_intra:
+        sub_idx = list(sub_dict.keys())[0]
+        print(f"Processing subject: {sub_idx}")
 
+        sub_pre = sub_dict[sub_idx]['pre']
+        sub_intra = sub_dict[sub_idx]['intra']
+
+        # create sub folder in pre and intra
+        sub_pre_dir = os.path.join(pre_dir, str(sub_idx))
+        sub_intra_dir = os.path.join(intra_dir, str(sub_idx))
+        os.makedirs(sub_pre_dir, exist_ok=True)
+        os.makedirs(sub_intra_dir, exist_ok=True)
+            
+        img_pre_dir = os.path.join(sub_pre_dir, 'img')
+        label_pre_dir = os.path.join(sub_pre_dir, 'label')
+        os.makedirs(img_pre_dir, exist_ok=True)
+        os.makedirs(label_pre_dir, exist_ok=True)
+        
+        img_intra_dir = os.path.join(sub_intra_dir, 'img')
+        label_intra_dir = os.path.join(sub_intra_dir, 'label')
+        os.makedirs(img_intra_dir, exist_ok=True)
+        os.makedirs(label_intra_dir, exist_ok=True)
+
+        ## process pre imags
+        for img_name in sub_pre:
+            img_path = os.path.join(args.dataset, str(sub_idx), sub_dict[sub_idx]['folder'], f'{img_name}.jpg')
+            ann_path_1 = os.path.join(args.dataset, str(sub_idx), sub_dict[sub_idx]['folder'], f'{img_name}.json')
+            ann_path_2 = os.path.join(args.dataset, str(sub_idx), sub_dict[sub_idx]['folder'], f'{img_name}.xml')
+            if not os.path.exists(img_path):
+                print(f"   - WARNING: image {img_name} not found for subject {sub_idx}")
+            if not os.path.exists(ann_path_1):
+                ann_path = ann_path_2
+            else:
+                ann_path = ann_path_1
+
+            print(os.path.basename(img_path), os.path.basename(ann_path))
+            img = Image.open(img_path).convert("RGB")
+            points = read_json_annotation(ann_path) if ann_path.endswith('.json') else read_xml_annotation(ann_path)
+            mask = np.zeros((img.height, img.width), dtype=np.uint8)
+            for m in points:
+                if len(m) > 0:
+                    cv2.fillPoly(mask, [np.array(m, dtype=np.int32)], 1)
+
+            ## save img and mask
+            img.save(os.path.join(img_pre_dir, f'{img_name}.jpg'))
+            Image.fromarray(mask, mode="L").save(os.path.join(label_pre_dir, f'{img_name}.png'))
+
+        print()
+
+        ## process intra imags
+        for img_name in sub_intra:
+            img_path = os.path.join(args.dataset, str(sub_idx), sub_dict[sub_idx]['folder'], f'{img_name}.jpg')
+            ann_path_1 = os.path.join(args.dataset, str(sub_idx), sub_dict[sub_idx]['folder'], f'{img_name}.json')
+            ann_path_2 = os.path.join(args.dataset, str(sub_idx), sub_dict[sub_idx]['folder'], f'{img_name}.xml')
+            if not os.path.exists(img_path):
+                print(f"   - WARNING: image {img_name} not found for subject {sub_idx}")
+            if not os.path.exists(ann_path_1):
+                ann_path = ann_path_2
+            else:
+                ann_path = ann_path_1
+
+            print(os.path.basename(img_path), os.path.basename(ann_path))
+            img = Image.open(img_path).convert("RGB")
+            points = read_json_annotation(ann_path) if ann_path.endswith('.json') else read_xml_annotation(ann_path)
+            mask = np.zeros((img.height, img.width), dtype=np.uint8)
+            for m in points:
+                if len(m) > 0:
+                    cv2.fillPoly(mask, [np.array(m, dtype=np.int32)], 1)
+
+            ## save img and mask
+            img.save(os.path.join(img_intra_dir, f'{img_name}.jpg'))
+            Image.fromarray(mask, mode="L").save(os.path.join(label_intra_dir, f'{img_name}.png'))
+
+def get_data_splittings(dataset_info, args, splitting_seed=42):
+    """
+    Given the path of the dataset return the list of patient for train, valindation and test
+    """
+    print("Creating data splittings...")
+    np.random.seed(splitting_seed)
+
+    per_and_intra_subject_split = [13, 3, 3]
+    only_intra_subject_split = [4, 3, 4]
+
+    pre_and_intra_dicts = dataset_info['pre_and_intra']
+    only_intra_dicts = dataset_info['only_intra']
+    pre_and_intra_subjects = [list(sub_dict.keys())[0] for sub_dict in pre_and_intra_dicts]
+    only_intra_subjects = [list(sub_dict.keys())[0] for sub_dict in only_intra_dicts]
+
+    np.random.shuffle(pre_and_intra_subjects)
+    np.random.shuffle(only_intra_subjects)
+
+    n_train_pre_and_intra = pre_and_intra_subjects[:per_and_intra_subject_split[0]]
+    n_val_pre_and_intra = pre_and_intra_subjects[per_and_intra_subject_split[0]:per_and_intra_subject_split[0]+per_and_intra_subject_split[1]]
+    n_test_pre_and_intra = pre_and_intra_subjects[per_and_intra_subject_split[0]+per_and_intra_subject_split[1]:]
+
+    n_train_only_intra = only_intra_subjects[:only_intra_subject_split[0]]
+    n_val_only_intra = only_intra_subjects[only_intra_subject_split[0]:only_intra_subject_split[0]+only_intra_subject_split[1]]
+    n_test_only_intra = only_intra_subjects[only_intra_subject_split[0]+only_intra_subject_split[1]:]
+    
+    train = n_train_pre_and_intra + n_train_only_intra
+    val = n_val_pre_and_intra + n_val_only_intra
+    test = n_test_pre_and_intra + n_test_only_intra
+    splitting_dict = {'train': train, 'val': val, 'test': test}
+
+    ## save splitting dict
+    save_dir = args.save_dir
+    splitting_path = os.path.join(save_dir, 'splitting.json')
+    with open(splitting_path, 'w') as f:
+        json.dump(splitting_dict, f, indent=4)
+    print(f"Done!")
+
+
+    return splitting_dict
 
 def main(args):
     """
@@ -255,11 +366,9 @@ def main(args):
     ## process dataset
     processing_dataset(dataset_info, args)
 
-    
-   
+    ## create data splittings
+    get_data_splittings(dataset_info, args)
 
-
-   
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Read HENANCE dataset')
