@@ -674,11 +674,207 @@ class PrePostiUS(Dataset):
 
         return data_list, subject_list  
 
+class PreIntraEndoscopy(Dataset):
+    """
+    Dataset class for Endoscopy (HENANCE) segmentation. The structure of the folder is compatible with 
+    future direction of the project, i.e., using preopreative information for guiding segmentation. 
+    In line with this goal the dataset is structured in 'subjects' folders
+
+    Folder structure:
+        main_path
+        ├── dataset_name
+        |    ├── pre 
+        |    |    ├── subject_idx
+        |    |    |    ├── img
+        |    |    |    |    ├── subject_idx_info_img.png
+        |    |    |    |    ├── ...
+        |    |    |    ├── label
+        |    |    |    |    ├── subject_idx_info_img.png
+        |    |    |    |    ├── ...
+        |    ├── intra
+        |    |    ├── subject_idx
+        |    |    |    ├── img
+        |    |    |    |    ├── subject_idx_info_img.png
+        |    |    |    |    ├── ...
+        |    |    |    ├── label
+        |    |    |    |    ├── subject_idx_info_img.png
+        |    |    |    |    ├── ...
+
+        joint_transform: augmentation transform, an instance of JointTransform2D. If bool(joint_transform)
+            evaluates to False, torchvision.transforms.ToTensor will be used on both image and mask.
+        one_hot_mask: bool, if True, returns the mask in one-hot encoded form.
+    """
+    def __init__(self,
+                main_path: str,
+                dataset_name: str,
+                pre_plus_intra: bool, 
+                split: str, 
+                joint_transform: Callable = None, 
+                img_size = 256, 
+                prompt = "click", 
+                degree_prompt = 0,
+                class_id = 1,
+                one_hot_mask: int = False) -> None:
+
+        ## Dataset path
+        self.main_path = main_path
+        self.dataset_name = dataset_name
+        self.split = split
+
+        # I want to distinguish between 'intra' only dataset and 'pre' + 'intra' dataset
+        # pre_plus_intra = True -> dataset where I do not use preop info ad prompt BUT as input
+        # pre_plus_intra = False -> dataset where I intra data as input AND eventually pre data as prompt 
+        self.pre_plus_intra = pre_plus_intra  ## if True, data only from intraoper
+        self.one_hot_mask = one_hot_mask
+        
+        self.data_list, self.subject_list = self.get_data_list()
+
+        self.prompt = prompt
+        self.img_size = img_size
+        self.class_id = class_id
+        self.degree_prompt = degree_prompt    ## number of img/mask/text to use as prompt information
+        
+        if joint_transform is not None:
+            self.joint_transform = joint_transform
+        else:
+            to_tensor = T.ToTensor()
+            self.joint_transform = lambda x, y: (to_tensor(x), to_tensor(y))
+    
+    def __len__(self):
+        return len(self.data_list)
+    
+    def __getitem__(self, idx):
+        pass
+
+    def get_image_label(self, idx):
+        """
+        Get image label depend on configuration of trainin, i.e. pre_plus_intra or only intra
+        """
+        image_info = self.data_list[idx]
+        
+        ## Post iUS - input iUS and target mask
+        img_path = os.path.join(self.main_path, self.dataset_name, image_info[0], image_info[1].split('_')[0], 'img', image_info[1])
+        mask_path = os.path.join(self.main_path, self.dataset_name, image_info[0], image_info[1].split('_')[0], 'label', image_info[1])
+        mask_path = mask_path.replace('.jpg', '.png')
+
+        image = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        mask = cv2.imread(mask_path, 0)
+
+        if self.degree_prompt > 0: ## Pre Endoscopic, I set numer of preop to use as prompt information
+            print("Using preoperative information as prompt")
+            subject_prompt_dir = os.path.join(self.main_path, self.dataset_name, 'pre', image_info[1].split('_')[0])
+            img_prompt_path = os.path.join(subject_prompt_dir, 'img')
+            prompt_images_list = [f for f in os.listdir(img_prompt_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            
+            if len(prompt_images_list) == 0: # check if intra subject has preoperative info
+                # similar to no preopreative info
+                return self.class_id, image, mask, image_info[1], 0, 0, 0
+
+            # select random 'degree_prompt' images (or all if less than that)
+            num_samples = min(self.degree_prompt, len(prompt_images_list))
+            selected_prompts = random.sample(prompt_images_list, num_samples)
+            
+            prompt_imgs, prompt_masks = [], []
+            for i in selected_prompts:
+                img_prompt = os.path.join(subject_prompt_dir, 'img', i)
+                mask_prompt = os.path.join(subject_prompt_dir, 'label', i)
+                text_prompt = os.path.join(subject_prompt_dir, 'text', 'text_prompt.txt')
+                
+                img_prompt = cv2.imread(img_prompt, cv2.IMREAD_COLOR)
+                img_prompt = cv2.cvtColor(img_prompt, cv2.COLOR_BGR2RGB)
+                mask_prompt = cv2.imread(mask_prompt,0)
+
+                prompt_imgs.append(img_prompt)
+                prompt_masks.append(mask_prompt)
+
+            # Leggi il testo del prompt, TO DO...
+            text_prompt_path = os.path.join(subject_prompt_dir, 'text', 'text_prompt.txt')
+            if os.path.exists(text_prompt_path):
+                with open(text_prompt_path, 'r', encoding='utf-8') as f:
+                    text_prompt = f.read().strip()
+            else:
+                text_prompt = ""
+
+            return self.class_id, image, mask, image_info[1], prompt_imgs, prompt_masks, text_prompt
+        
+        else: # No preoperative information
+            print("No preoperative information used as prompt")
+            return self.class_id, image, mask, image_info[1], 0, 0, 0
+
+
+    def get_data_list(self):
+        """
+        From patients name get the data list.
+        Modular functio to get both dataset for 'intra' training with 'pre' prompt
+        and the combine tarining with 'pre' and 'intra' as input.
+
+        1) subject_i -> intra/subject_i
+        2) subject_i -> pre/subject_i and intra/subject_i
+        """
+        json_path = os.path.join(self.main_path, self.dataset_name, 'splitting.json')
+        with open(json_path, 'r') as f:
+            splitting_dict = json.load(f)
+      
+        subject_list = splitting_dict[self.split]
+        
+        if not self.pre_plus_intra:  ## intra only dataset with pre as prompt
+            data_list = []
+            for subject in subject_list:
+                post_path = os.path.join(self.main_path, self.dataset_name, 'intra', subject)
+                for img_name in os.listdir(os.path.join(post_path,'img')):
+                    data_post = ['intra', img_name]
+                    data_list.append(data_post)
+
+            return data_list, subject_list
+
+        else:   ## combined pre + intra dataset as input data
+            data_list = []
+            for subject in subject_list:
+                pre_path = os.path.join(self.main_path, self.dataset_name, 'pre', subject)
+                for img_name in os.listdir(os.path.join(pre_path,'img')):
+                    data_pre = ['pre', img_name]
+                    data_list.append(data_pre)
+                
+                post_path = os.path.join(self.main_path, self.dataset_name, 'intra', subject)
+                for img_name in os.listdir(os.path.join(post_path,'img')):
+                    data_post = ['intra', img_name]
+                    data_list.append(data_post)
+            return data_list, subject_list
+
 if __name__ == '__main__':
     from preoperativeSAM.cfg import get_config
     import matplotlib.patches as patches
 
-    ## Single acquisition dataset
+    ## HENANCE DATASET
+    opt = get_config("PreIntraEndo")
+
+    low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
+    encoder_input_size = 256   ## the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS
+    degree_prompt = 0          ## how many preop images to use as prompt information
+
+    transform = JointTransform2D(img_size=encoder_input_size, low_img_size=low_image_size, ori_size=opt.img_size, crop=opt.crop, 
+                                p_flip=0.0, p_rota=0.5, p_scale=0.5, p_gaussn=0.0,
+                                p_contr=0.5, p_gama=0.5, p_distor=0.0, 
+                                color_jitter_params=None, long_mask=True)
+
+    dataset = PreIntraEndoscopy(main_path = opt.main_path, 
+                                dataset_name = opt.dataset_name, 
+                                split = opt.test_split, 
+                                pre_plus_intra = False,
+                                joint_transform = transform, 
+                                img_size = opt.img_size,
+                                degree_prompt = degree_prompt,
+                                prompt = "click",
+                                class_id = 1)
+
+    
+    print(dataset.get_image_label(0))
+
+    exit()
+
+
+    ## Single acquisition dataset iUS
     opt = get_config("PreDura")
 
     low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
