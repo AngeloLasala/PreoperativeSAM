@@ -737,6 +737,8 @@ class PreIntraEndoscopy(Dataset):
         if joint_transform is not None:
             self.joint_transform = joint_transform
         else:
+            ## TO DO: this do not work because do not generate low mask
+            ## use a costune Join trasformation will null augmentation
             to_tensor = T.ToTensor()
             self.joint_transform = lambda x, y: (to_tensor(x), to_tensor(y))
     
@@ -744,7 +746,75 @@ class PreIntraEndoscopy(Dataset):
         return len(self.data_list)
     
     def __getitem__(self, idx):
-        pass
+        class_id0, image, mask, filename, img_prompt, mask_prompt, text_prompt = self.get_image_label(idx)
+
+        # ## correct dimensions if needed & Data Augumentation
+        image, mask = correct_dims(image, mask)  
+        image, mask, low_mask = self.joint_transform(image, mask)
+
+        if self.one_hot_mask:
+            assert self.one_hot_mask > 0, 'one_hot_mask must be nonnegative'
+            mask = torch.zeros((self.one_hot_mask, mask.shape[1], mask.shape[2])).scatter_(0, mask.long(), 1)
+
+        # --------- make the point prompt -----------------
+        if self.prompt == 'click':
+            point_label = 1
+            if 'train' in self.split:
+                #class_id = randint(1, classes-1)
+                class_id = int(class_id0)
+            elif 'val' in self.split:
+                class_id = int(class_id0)
+            else:
+                class_id = self.class_id
+
+            if 'train' in self.split:
+                pt, point_label = random_click(np.asarray(mask), class_id)
+                bbox = random_bbox(np.asarray(mask), class_id, self.img_size)
+            else:
+                pt, point_label = fixed_click(np.asarray(mask), class_id)
+                bbox = fixed_bbox(np.asarray(mask), class_id, self.img_size)
+
+            mask[mask!=class_id] = 0
+            mask[mask==class_id] = 1
+            low_mask[low_mask!=class_id] = 0
+            low_mask[low_mask==class_id] = 1
+            point_labels = np.array(point_label)
+       
+        low_mask = low_mask.unsqueeze(0)
+        mask = mask.unsqueeze(0)
+
+
+        if img_prompt != 0 and mask_prompt != 0 and text_prompt != 0:
+
+            ## Processinf prompt info
+            imgs_p, masks_p, low_masks_p = [], [], []
+            for img_p, mask_p in zip(img_prompt, mask_prompt):
+                
+                img_p, mask_p = correct_dims(img_p, mask_p)
+                imag_p, mask_p, low_mask_p = self.joint_transform(img_p, mask_p)
+                mask_p = mask_p.unsqueeze(0)
+                
+                imgs_p.append(imag_p)
+                masks_p.append(mask_p)
+                low_masks_p.append(low_mask_p)
+
+            img_prompt = torch.stack(imgs_p, dim=0)
+            mask_prompt = torch.stack(masks_p, dim=0)
+
+        return {
+                'image': image,
+                'label': mask,
+                'p_label': point_labels,
+                'pt': pt,
+                'bbox': bbox,
+                'low_mask':low_mask,
+                'image_name': filename,
+                'class_id': class_id,
+                'img_prompt': img_prompt,
+                'mask_prompt': mask_prompt,
+                'text_prompt': text_prompt
+                }
+        
 
     def get_image_label(self, idx):
         """
@@ -761,8 +831,8 @@ class PreIntraEndoscopy(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         mask = cv2.imread(mask_path, 0)
 
-        if self.degree_prompt > 0: ## Pre Endoscopic, I set numer of preop to use as prompt information
-            print("Using preoperative information as prompt")
+        ## Pre Endoscopic, I set numer of preop to use as prompt information
+        if self.degree_prompt > 0 and self.pre_plus_intra is not True: 
             subject_prompt_dir = os.path.join(self.main_path, self.dataset_name, 'pre', image_info[1].split('_')[0])
             img_prompt_path = os.path.join(subject_prompt_dir, 'img')
             prompt_images_list = [f for f in os.listdir(img_prompt_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
@@ -779,6 +849,8 @@ class PreIntraEndoscopy(Dataset):
             for i in selected_prompts:
                 img_prompt = os.path.join(subject_prompt_dir, 'img', i)
                 mask_prompt = os.path.join(subject_prompt_dir, 'label', i)
+                mask_prompt = mask_prompt.replace('.jpg', '.png')
+
                 text_prompt = os.path.join(subject_prompt_dir, 'text', 'text_prompt.txt')
                 
                 img_prompt = cv2.imread(img_prompt, cv2.IMREAD_COLOR)
@@ -799,7 +871,6 @@ class PreIntraEndoscopy(Dataset):
             return self.class_id, image, mask, image_info[1], prompt_imgs, prompt_masks, text_prompt
         
         else: # No preoperative information
-            print("No preoperative information used as prompt")
             return self.class_id, image, mask, image_info[1], 0, 0, 0
 
 
@@ -851,7 +922,7 @@ if __name__ == '__main__':
 
     low_image_size = 128       ## the image embedding size, 256 in SAM and MSA, 128 in SAMed and SAMUS
     encoder_input_size = 256   ## the image size of the encoder input, 1024 in SAM and MSA, 512 in SAMed, 256 in SAMUS
-    degree_prompt = 0          ## how many preop images to use as prompt information
+    degree_prompt = 2          ## how many preop images to use as prompt information
 
     transform = JointTransform2D(img_size=encoder_input_size, low_img_size=low_image_size, ori_size=opt.img_size, crop=opt.crop, 
                                 p_flip=0.0, p_rota=0.5, p_scale=0.5, p_gaussn=0.0,
@@ -868,8 +939,45 @@ if __name__ == '__main__':
                                 prompt = "click",
                                 class_id = 1)
 
+    idx = np.random.randint(0,10)
+    for i in range(10):
+        data = dataset[idx]
+     
+        ig, axes = plt.subplots(1, 3, figsize=(10, 5), num=i)
+        axes[0].imshow(data['image'].permute(1,2,0).numpy(), cmap='gray')
+        axes[0].set_title("Immagine")
+        # axes[0].axis('off')
+
+        axes[1].imshow(data['image'].permute(1,2,0).numpy(), cmap='gray')
+        axes[1].imshow(data['label'][0], alpha=0.2, cmap='jet')
+        ## click
+        x, y = data["pt"][0] 
+        axes[1].scatter(x, y, c='red', s=80, marker='x', label='Click') 
+        x_min, y_min, x_max, y_max = data["bbox"]
+        ## bbox
+        rect2 = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min,
+                              linewidth=2, edgecolor='red', facecolor='none', label='BBox')
+        axes[1].add_patch(rect2)
+        axes[1].set_title("Immagine + Maschera")
+        # axes[1].axis('off')
+
+        axes[2].imshow(data['low_mask'][0], cmap='gray')
+        axes[2].set_title("Immagine")
+
+        ## do the same visulaization for prompt info
+        fig, axes = plt.subplots(1, degree_prompt*2, figsize=(20, 5), num='Prompt info ' + str(i))
+        print(data['img_prompt'].shape, data['mask_prompt'].shape)
+        for j in range(degree_prompt):
+            axes[j*2].imshow(data['img_prompt'][j].permute(1,2,0).numpy(), cmap='gray')
+            axes[j*2].set_title(f'Prompt Image {j+1}')
+            axes[j*2].axis('off')
+
+            axes[j*2+1].imshow(data['img_prompt'][j].permute(1,2,0).numpy(), cmap='gray')
+            axes[j*2+1].imshow(data['mask_prompt'][j][0], alpha=0.2, cmap='jet')
+            axes[j*2+1].set_title(f'Prompt Mask {j+1}')
+            axes[j*2+1].axis('off')
+        plt.show()
     
-    print(dataset.get_image_label(0))
 
     exit()
 
@@ -888,7 +996,7 @@ if __name__ == '__main__':
     dataset = IntroperativeiUS(main_path = opt.main_path, 
                                 dataset_name = opt.dataset_name, 
                                 split = opt.train_split, 
-                                joint_transform = transform, 
+                                joint_transform = None, 
                                 img_size = opt.img_size,
                                 prompt = "click",
                                 class_id = 1)
